@@ -1,0 +1,536 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Card Agent Bake-off</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: one scene at a time, two lanes side by side (Side A AgentCore, Side B Atlas), notes underneath. Ledger-like, utilitarian. */
+:root{
+  --bg:#f4f6f5; --surface:#ffffff; --sunk:#eaeeec; --ink:#14201b; --muted:#5a6762; --line:#d6ddd9;
+  --a:#a85a17; --a-soft:#f6ebe0; --b:#0c7656; --b-soft:#e0f1ea;
+  --warn:#b42318; --warn-soft:#fbe7e5; --ok:#1d7a3c; --ok-soft:#e3f3e8;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0e1412; --surface:#151d1a; --sunk:#1b2521; --ink:#e5ebe8; --muted:#97a49e; --line:#2a3631;
+  --a:#e39a58; --a-soft:#2c2118; --b:#43c598; --b-soft:#13291f;
+  --warn:#f2867a; --warn-soft:#331b19; --ok:#62d08c; --ok-soft:#14291c; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0e1412; --surface:#151d1a; --sunk:#1b2521; --ink:#e5ebe8; --muted:#97a49e; --line:#2a3631;
+  --a:#e39a58; --a-soft:#2c2118; --b:#43c598; --b-soft:#13291f;
+  --warn:#f2867a; --warn-soft:#331b19; --ok:#62d08c; --ok-soft:#14291c; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(28px,4vw,40px);font-weight:700;letter-spacing:-.01em}
+h2{font-size:clamp(22px,2.6vw,28px);font-weight:600}
+h3{font-size:17px;font-weight:600}
+p{margin:0}
+.mono{font-family:var(--f-mono)}
+.label{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+
+/* header */
+header{display:flex;flex-direction:column;gap:12px}
+.lede{max-width:72ch;color:var(--muted)}
+.facts{display:flex;flex-wrap:wrap;gap:8px}
+.fact{font-family:var(--f-mono);font-size:12.5px;padding:5px 10px;border:1px solid var(--line);border-radius:4px;background:var(--surface)}
+.fact b{font-weight:500;color:var(--ink)}
+
+/* tabs */
+nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:8px;border-bottom:1px solid var(--line)}
+.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:thin}
+.tab{flex:0 0 auto;font:inherit;font-size:13.5px;border:1px solid transparent;background:none;color:var(--muted);
+  padding:7px 12px;border-radius:4px;cursor:pointer;display:flex;gap:8px;align-items:center;white-space:nowrap}
+.tab:hover{color:var(--ink);background:var(--sunk)}
+.tab[aria-selected="true"]{color:var(--ink);background:var(--surface);border-color:var(--line);font-weight:500}
+.tab .n{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.tab:focus-visible,.btn:focus-visible{outline:2px solid var(--b);outline-offset:2px}
+
+/* scene */
+.scene-head{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-end}
+.scene-head .txt{display:flex;flex-direction:column;gap:8px;min-width:0;max-width:78ch}
+.kind{display:inline-flex;gap:6px;align-items:center;font-family:var(--f-mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:3px}
+.kind.structural{background:var(--b-soft);color:var(--b)}
+.kind.feature{background:var(--sunk);color:var(--muted)}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font:inherit;font-size:13.5px;font-weight:500;padding:8px 14px;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn:hover{filter:brightness(1.06)}
+
+.setup{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.prompt{border-left:3px solid var(--ink)}
+.prompt q{font-size:16px;quotes:"“" "”"}
+
+.lanes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.lane{background:var(--surface);border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.lane-head{padding:12px 16px;display:flex;flex-direction:column;gap:2px;border-bottom:1px solid var(--line)}
+.lane.a .lane-head{background:var(--a-soft)} .lane.b .lane-head{background:var(--b-soft)}
+.lane.a .side{color:var(--a)} .lane.b .side{color:var(--b)}
+.side{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:500}
+.stack{font-family:var(--f-display);font-weight:600;font-size:16.5px}
+.lane-body{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.ev{display:flex;gap:10px;align-items:flex-start;transition:opacity .35s ease, transform .35s ease}
+.ev.hide{opacity:0;transform:translateY(4px)}
+.ev .tag{flex:0 0 58px;font-family:var(--f-mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:3px}
+.ev .body{min-width:0;flex:1}
+.ev.trace .body{font-family:var(--f-mono);font-size:12.5px;line-height:1.5;color:var(--muted);background:var(--sunk);padding:6px 9px;border-radius:4px;overflow-wrap:anywhere}
+.ev.trace .body b{color:var(--ink);font-weight:500}
+.ev.agent .body,.ev.user .body{padding:8px 11px;border-radius:6px;border:1px solid var(--line)}
+.ev.user .body{background:var(--bg)}
+.ev.agent .body{background:var(--surface)}
+.ev.warn .body{background:var(--warn-soft);color:var(--warn);border:1px solid transparent;padding:7px 10px;border-radius:4px;font-weight:500}
+.ev.ok .body{background:var(--ok-soft);color:var(--ok);border:1px solid transparent;padding:7px 10px;border-radius:4px;font-weight:500}
+.ev.note .body{color:var(--muted);font-style:italic;font-size:14px}
+.verdict{margin-top:auto;border-top:1px solid var(--line);padding:11px 16px;display:flex;gap:10px;align-items:baseline;font-size:14px}
+.verdict .label{flex:0 0 auto}
+
+pre{margin:0;font-family:var(--f-mono);font-size:12.5px;line-height:1.55;background:var(--sunk);padding:12px 14px;border-radius:4px;overflow-x:auto;color:var(--ink)}
+pre .c{color:var(--muted)}
+.notes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.notes .box h3{font-size:15px}
+.notes .say{border-top:3px solid var(--b)}
+.notes .fair{border-top:3px solid var(--muted)}
+.extra{display:flex;flex-direction:column;gap:10px}
+
+/* hop diagram (scene 1) */
+.hops{display:flex;flex-direction:column;gap:8px}
+.hop{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:4px;background:var(--bg)}
+.hop .what{font-size:13.5px;min-width:0}
+.hop .where{font-family:var(--f-mono);font-size:11px;padding:2px 7px;border-radius:3px;white-space:nowrap}
+.where.own{background:var(--ok-soft);color:var(--ok)}
+.where.svc{background:var(--a-soft);color:var(--a)}
+.where.llm{background:var(--sunk);color:var(--muted)}
+.arrow{font-family:var(--f-mono);color:var(--muted);font-size:12px;padding-left:12px}
+
+/* token bars (scene 5) */
+.bars{display:flex;flex-direction:column;gap:8px}
+.bar-row{display:grid;grid-template-columns:118px minmax(0,1fr) 64px;gap:10px;align-items:center;font-size:13px}
+.bar-track{height:14px;background:var(--sunk);border-radius:2px;overflow:hidden}
+.bar-fill{height:100%;border-radius:2px}
+.bar-row .v{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right}
+
+/* overview + summary */
+.arch{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.comp{display:flex;flex-direction:column;gap:6px}
+.chip{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:4px;border:1px solid var(--line);background:var(--bg);font-size:13.5px}
+.chip .k{font-family:var(--f-mono);font-size:11px;color:var(--muted);white-space:nowrap}
+.chip.copy{border-style:dashed}
+.count{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);padding-top:4px}
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.rule{padding:12px 14px;border:1px solid var(--line);border-radius:6px;background:var(--surface);display:flex;flex-direction:column;gap:4px}
+.rule b{font-weight:600}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:14px}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--sunk)}
+tr:last-child td{border-bottom:none}
+td .kind{white-space:nowrap}
+.footer-note{color:var(--muted);font-size:13px;max-width:90ch}
+.ctlwrap{overflow-x:auto}
+.challenge{border-top:3px solid var(--warn);gap:10px}
+.dilemma{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.dilemma>div{border:1px solid var(--line);border-radius:4px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;background:var(--bg);min-width:0}
+.dilemma>div.win{background:var(--b-soft);border-color:transparent}
+.dilemma>div.win .label{color:var(--b)}
+.challenge .fine{color:var(--muted);font-size:13.5px}
+@media (max-width:820px){.dilemma{grid-template-columns:minmax(0,1fr)}}
+.ctl{min-width:560px;font-size:13.5px}
+.ctl th,.ctl td{padding:8px 10px}
+.ctl td.x{color:var(--a)}
+.ctl td.y{color:var(--b);font-weight:500}
+.pager{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+
+@media (max-width:820px){
+  .setup,.lanes,.notes,.arch{grid-template-columns:minmax(0,1fr)}
+  .bar-row{grid-template-columns:96px minmax(0,1fr) 56px}
+}
+@media (prefers-reduced-motion:reduce){ .ev{transition:none} }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="label">Banking demo · Simulation · Not live output</span>
+    <h1>Card Agent Bake-off</h1>
+    <p class="lede">One credit card servicing agent, built once in LangGraph, run on two platforms. Five scenes show where Atlas Agent Engine's memory differs from AgentCore Memory, and where it doesn't.</p>
+    <div class="facts">
+      <span class="fact">Bank <b>Harbourline Bank (fictional)</b></span>
+      <span class="fact">Customer <b>Tan Wei Ling</b></span>
+      <span class="fact">Card <b>Platinum ending 2081</b></span>
+      <span class="fact">Region <b>Singapore</b></span>
+      <span class="fact">Model <b>Claude, same on both sides</b></span>
+    </div>
+  </header>
+
+  <nav aria-label="Scenes"><div class="tabs" role="tablist" id="tabs"></div></nav>
+
+  <main id="stage" aria-live="polite"></main>
+
+  <p class="footer-note">Simulated transcripts and traces for discussion. Atlas Agent Engine is in public preview; memory collection names, field names and token counts shown here are illustrative and must be confirmed in the real build.</p>
+</div>
+
+<script>
+const VIEWS = [
+  {id:"overview", n:"0", title:"Setup"},
+  {id:"residency", n:"1", title:"Where memory lives"},
+  {id:"stale", n:"2", title:"Fraud freeze"},
+  {id:"procedural", n:"3", title:"Fee-waiver procedure"},
+  {id:"taxonomic", n:"4", title:"Bank vocabulary"},
+  {id:"context", n:"5", title:"Context assembly"},
+  {id:"summary", n:"✓", title:"Scorecard"}
+];
+
+const SCENES = {
+  residency:{
+    point:"Point 1 of 5", kind:"structural",
+    title:"Where does the agent's memory live?",
+    setup:"Wei Ling mentions a relocation. Both agents decide it is worth remembering. Follow the memory from conversation to storage.",
+    prompt:"I'm moving to Melbourne for work next month. I'll keep using this card there.",
+    a:[
+      ["user","I'm moving to Melbourne for work next month. I'll keep using this card there."],
+      ["agent","Thanks for letting us know. I've noted your move so we don't block your card overseas."],
+      ["trace","<b>CreateEvent</b> → AgentCore Memory (short-term events)"],
+      ["trace","<b>Semantic strategy</b> extracts: “relocating to Melbourne next month”"],
+      ["note","Built-in strategy extraction runs in an AWS service-managed account and may use cross-region inference within the geography."],
+      ["trace","Memory record stored in AgentCore Memory · readable through the AgentCore API"],
+      ["warn","Two places to secure: AgentCore Memory and Aurora, each with its own encryption, backup, access control and audit log"]
+    ],
+    b:[
+      ["user","I'm moving to Melbourne for work next month. I'll keep using this card there."],
+      ["agent","Thanks for letting us know. I've noted your move so we don't block your card overseas."],
+      ["trace","<b>record_turn()</b> → short-term memory in Harbourline's Atlas cluster"],
+      ["trace","<b>Extraction</b> calls Claude with Harbourline's own API key"],
+      ["trace","Semantic memory written to <b>agent_memory</b> collection, same cluster as <b>accounts</b>"],
+      ["ok","Covered by the cluster's existing encryption, backup, access control and audit log"]
+    ],
+    av:"Memory and customer data live in two systems, so every security control is set up and audited twice.",
+    bv:"Memory sits in the bank's own cluster, next to customer data.",
+    extra:`<div class="setup">
+      <div class="box"><span class="label">Side A · path of one memory</span><div class="hops">
+        <div class="hop"><span class="what">Conversation event</span><span class="where svc">AgentCore Memory</span></div>
+        <div class="arrow">↓</div>
+        <div class="hop"><span class="what">LLM extraction (built-in strategy)</span><span class="where svc">AWS service account</span></div>
+        <div class="arrow">↓</div>
+        <div class="hop"><span class="what">Long-term memory record</span><span class="where svc">AgentCore Memory</span></div>
+        <div class="hop"><span class="what">Customer accounts</span><span class="where own">Bank's Aurora DB</span></div>
+      </div></div>
+      <div class="box"><span class="label">Side B · path of one memory</span><div class="hops">
+        <div class="hop"><span class="what">Conversation turn</span><span class="where own">Bank's Atlas cluster</span></div>
+        <div class="arrow">↓</div>
+        <div class="hop"><span class="what">LLM extraction</span><span class="where llm">Bank-chosen LLM provider</span></div>
+        <div class="arrow">↓</div>
+        <div class="hop"><span class="what">Long-term memory document</span><span class="where own">Bank's Atlas cluster</span></div>
+        <div class="hop"><span class="what">Customer accounts</span><span class="where own">Bank's Atlas cluster</span></div>
+      </div></div>
+    </div>
+    <div class="box"><span class="label">Security controls to manage for customer data + agent memory</span>
+      <div class="ctlwrap"><table class="ctl">
+        <thead><tr><th>Control</th><th>Side A · AgentCore Memory</th><th>Side A · Aurora</th><th>Side B · Atlas cluster</th></tr></thead>
+        <tbody>
+          <tr><td><b>Encryption</b></td><td class="x">Configure</td><td class="x">Configure</td><td class="y">Configure once</td></tr>
+          <tr><td><b>Backup and restore</b></td><td class="x">Separate policy</td><td class="x">Separate policy</td><td class="y">One policy</td></tr>
+          <tr><td><b>Access control</b></td><td class="x">IAM for the memory API</td><td class="x">DB roles + IAM</td><td class="y">One set of roles</td></tr>
+          <tr><td><b>Audit log</b></td><td class="x">Separate trail</td><td class="x">Separate trail</td><td class="y">One audit log</td></tr>
+          <tr><td><b>Total to manage</b></td><td class="x" colspan="2">2 systems × 4 controls = 8</td><td class="y">1 system × 4 controls = 4</td></tr>
+        </tbody>
+      </table></div>
+    </div>`,
+    say:"Ask the risk team one question: where does the agent's memory physically live, and who processes it? On Side A, every control is set up, evidenced and audited in two systems. On Side B it's the same cluster you already audit.",
+    fair:"Side B still sends conversation text to an LLM provider for extraction. AgentCore also offers custom strategies that run extraction with a model you pick in your own account. Check AgentCore's current region and encryption options before claiming a gap."
+  },
+
+  stale:{
+    point:"Point 2 of 5", kind:"structural",
+    title:"Fraud freezes the card. Does the agent know?",
+    setup:"Last week the agent remembered that Wei Ling was pre-qualified for a limit increase. This morning at 09:12, fraud operations froze her card. At 09:14 she comes back.",
+    prompt:"Hi, can you go ahead with the credit limit increase we talked about?",
+    a:[
+      ["trace","09:12 Fraud ops sets <b>accounts.status = 'frozen'</b> in Aurora"],
+      ["user","Hi, can you go ahead with the credit limit increase we talked about?"],
+      ["trace","<b>RetrieveMemoryRecords</b> → “pre-qualified for limit increase to SGD 25,000”"],
+      ["agent","Yes. You're pre-qualified for a new limit of SGD 25,000. Shall I submit it now?"],
+      ["warn","Offer made to a frozen account. In a bank this is an incident."],
+      ["note","Fix: Aurora CDC → stream → Lambda → AgentCore Memory API to find and expire the record. Four parts, two systems, cross-service IAM."]
+    ],
+    b:[
+      ["trace","09:12 Fraud ops sets <b>accounts.status = 'frozen'</b> in Atlas"],
+      ["trace","Change stream on <b>accounts</b> fires → one aggregation flags this customer's offer memories"],
+      ["user","Hi, can you go ahead with the credit limit increase we talked about?"],
+      ["trace","<b>build_context()</b> → offer memory marked <b>stale: account frozen</b>"],
+      ["agent","I can't process a limit increase right now because there's a hold on your card. A specialist will contact you today."],
+      ["ok","No offer made. One query, one system."]
+    ],
+    av:"Memory can't see the freeze until a cross-system pipeline tells it.",
+    bv:"The freeze and the memory are in one database, so one query connects them.",
+    extra:`<div class="box challenge"><span class="label">The obvious challenge</span>
+      <h3>“Shouldn't the agent just check live account status from the source?”</h3>
+      <div class="dilemma">
+        <div><span class="label">Option 1 · Trust memory</span><p>Fast and cheap, but the agent acts on stale facts. That's the incident in this scene.</p></div>
+        <div><span class="label">Option 2 · Re-check every fact at the source</span><p>Safe, but memory adds nothing. Every remembered fact becomes an extra lookup per turn, with more latency, tool calls and tokens. Memory turns into a cache nobody trusts.</p></div>
+        <div class="win"><span class="label">Side B · No trade-off</span><p>Memory and source sit in one cluster. A change stream keeps memory fresh, so the agent can trust it. When you do verify, it's one <span class="mono">$lookup</span>, not a fan-out of tool calls.</p></div>
+      </div>
+      <p class="fine">Still verify before irreversible actions such as credit decisions or money movement. That's a control the bank needs on both sides. And memory still owns what the source doesn't have: preferences, past conversations and intent.</p>
+    </div>
+    <div class="box"><span class="label">Side B · the whole fix (names illustrative)</span>
+<pre><span class="c">// on change stream event: accounts.status → "frozen"</span>
+db.agent_memory.updateMany(
+  { user_id: event.customerId, type: "semantic", label: /offer|pre-qualified/ },
+  { $set: { stale: true, stale_reason: "account frozen", stale_at: new Date() } }
+)
+
+<span class="c">// audit view: every frozen customer whose agent still holds an offer</span>
+db.accounts.aggregate([
+  { $match: { status: "frozen" } },
+  { $lookup: { from: "agent_memory", localField: "customerId",
+               foreignField: "user_id", as: "mem" } },
+  { $unwind: "$mem" },
+  { $match: { "mem.stale": { $ne: true }, "mem.label": /offer/ } }
+])</pre></div>`,
+    say:"Memory isn't just chat history. It stores facts about your data, and copied facts go stale. Then show the audit query: you can't run that join against an API-only memory store.",
+    fair:"Atlas Agent Engine does not do this automatically; you still write the change-stream logic. On Side A, a team can reduce the risk by re-checking only high-risk facts, but then they must decide and maintain which facts those are."
+  },
+
+  procedural:{
+    point:"Point 3 of 5", kind:"feature",
+    title:"Following the late-fee waiver procedure",
+    setup:"Harbourline's waiver rule: customer for 12+ months, no waiver in the last 12 months, overdue balance now paid, log a reason code. Wei Ling asks for a waiver.",
+    prompt:"I paid three days late because I was travelling. Can you waive the late fee?",
+    a:[
+      ["user","I paid three days late because I was travelling. Can you waive the late fee?"],
+      ["trace","Procedure lives in the <b>system prompt</b> (version 3, deployed 14 Sep)"],
+      ["trace","Tool calls: tenure 4 yrs ✓ · last waiver none ✓ · balance paid ✓"],
+      ["agent","Done. I've waived the SGD 100 late fee. This uses your one waiver for the next 12 months."],
+      ["note","Changing the rule means editing the prompt and redeploying. Episodic reflection can learn insights, but there is no built-in procedure type."]
+    ],
+    b:[
+      ["user","I paid three days late because I was travelling. Can you waive the late fee?"],
+      ["trace","<b>discover_procedures</b>(\"late fee waiver\") → <b>get_procedure</b>(\"late-fee-waiver\")"],
+      ["trace","Tool calls: tenure 4 yrs ✓ · last waiver none ✓ · balance paid ✓"],
+      ["agent","Done. I've waived the SGD 100 late fee. This uses your one waiver for the next 12 months."],
+      ["ok","Procedure is stored data: versioned and updated without redeploying the agent"]
+    ],
+    av:"Same answer. Procedure is prompt text you redeploy.",
+    bv:"Same answer. Procedure is a memory record you can update and audit.",
+    extra:`<div class="box"><span class="label">Side B · the procedure as stored memory</span>
+<pre>chat.save_procedure(
+    procedure="late-fee-waiver",
+    description="Decide and apply a late-fee waiver.",
+    content="1. Tenure ≥ 12 months  2. No waiver in last 12 months  "
+            "3. Overdue balance paid  4. Waive once, log reason code LFW-01",
+)</pre></div>`,
+    say:"Both agents get it right. The difference is ownership: on Side B, ops can update the procedure as data, with an audit trail, without an engineering release.",
+    fair:"This is a feature, not an architecture advantage. Teams can store procedures themselves on Side A, and AWS can add a procedural type. Expect it to become table stakes."
+  },
+
+  taxonomic:{
+    point:"Point 4 of 5", kind:"feature",
+    title:"One definition of “provisional credit” for every customer",
+    setup:"Wei Ling has an open card dispute. The term on her statement confuses her. The bank wants every agent to explain it the same way.",
+    prompt:"My dispute says 'provisional credit'. Is that my money now?",
+    a:[
+      ["user","My dispute says 'provisional credit'. Is that my money now?"],
+      ["trace","Definition comes from a <b>glossary in the system prompt</b> or a custom namespace you design"],
+      ["agent","Not yet. Provisional credit is a temporary credit while we investigate. If the merchant wins the dispute, it can be reversed."],
+      ["note","Works if you build it. No built-in shared, project-wide memory type for domain terms."]
+    ],
+    b:[
+      ["user","My dispute says 'provisional credit'. Is that my money now?"],
+      ["trace","<b>search_taxonomic</b>(\"provisional credit\", domain=\"cards\") → org-scoped term"],
+      ["agent","Not yet. Provisional credit is a temporary credit while we investigate. If the merchant wins the dispute, it can be reversed."],
+      ["ok","One definition shared across all users and conversations in the project"]
+    ],
+    av:"Correct, if you've built and maintained the glossary.",
+    bv:"Correct from a built-in shared vocabulary.",
+    extra:`<div class="box"><span class="label">Side B · terms saved once, used by every conversation</span>
+<pre>chat.save_taxonomic(domain="cards", term="provisional credit",
+    definition="Temporary credit during a dispute investigation; reversed if the merchant wins.")
+chat.save_taxonomic(domain="cards", term="chargeback",
+    definition="Reversal of a card payment requested by the issuing bank.")</pre></div>`,
+    say:"Consistency of wording is a conduct-risk topic for banks. A shared vocabulary means every agent explains the same term the same way.",
+    fair:"Also a feature, not architecture. A knowledge base or a shared namespace does the same job on Side A. Don't oversell it."
+  },
+
+  context:{
+    point:"Point 5 of 5", kind:"feature",
+    title:"Turning memories into a prompt",
+    setup:"Wei Ling asks a broad question that needs facts, preferences and past conversations together.",
+    prompt:"Remind me what we discussed about my Melbourne move. Anything I still need to do?",
+    a:[
+      ["user","Remind me what we discussed about my Melbourne move. Anything I still need to do?"],
+      ["trace","<b>RetrieveMemoryRecords</b> × 3 namespaces: facts · preferences · episodes"],
+      ["trace","Your code: merge → de-duplicate → rank → trim to budget (~60 lines, illustrative)"],
+      ["agent","You told us you're moving next month and asked us not to block overseas use. Still to do: update your mailing address."],
+      ["note","Context sent to model: 3,900 tokens (illustrative)"]
+    ],
+    b:[
+      ["user","Remind me what we discussed about my Melbourne move. Anything I still need to do?"],
+      ["trace","<b>build_context</b>(query, enabled_sources={\"semantic\",\"episodic\"})"],
+      ["trace","Ranked, de-duplicated and trimmed to the token budget by the platform"],
+      ["agent","You told us you're moving next month and asked us not to block overseas use. Still to do: update your mailing address."],
+      ["ok","Context sent to model: 1,400 tokens (illustrative)"]
+    ],
+    av:"Same answer. You own the glue code and its token efficiency.",
+    bv:"Same answer. One call returns prompt-ready context.",
+    extra:`<div class="box"><span class="label">Context tokens per turn · illustrative, measure in the real build</span>
+      <div class="bars">
+        <div class="bar-row"><span>Side A · AgentCore</span><div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--a)"></div></div><span class="v">3,900</span></div>
+        <div class="bar-row"><span>Side B · Atlas</span><div class="bar-track"><div class="bar-fill" style="width:36%;background:var(--b)"></div></div><span class="v">1,400</span></div>
+      </div></div>`,
+    say:"Less glue code to own, and a token budget enforced by the platform. Tokens are cost, so this is a CFO-friendly point.",
+    fair:"The token numbers are placeholders. A skilled team can write equally tight assembly code on Side A. Only quote numbers you have measured in the real build."
+  }
+};
+
+const $ = s => document.querySelector(s);
+const esc = s => s;
+let timers = [];
+
+function renderTabs(active){
+  $("#tabs").innerHTML = VIEWS.map(v=>`<button class="tab" role="tab" id="tab-${v.id}" aria-selected="${v.id===active}" data-id="${v.id}"><span class="n">${v.n}</span>${v.title}</button>`).join("");
+  $("#tabs").querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>go(b.dataset.id)));
+  const t = $("#tab-"+active); if(t) t.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+
+function evHTML([t,body]){
+  const tags={user:"Customer",agent:"Agent",trace:"Trace",warn:"Risk",ok:"Result",note:"Note"};
+  return `<div class="ev ${t}"><span class="tag">${tags[t]}</span><div class="body">${body}</div></div>`;
+}
+
+function lane(side, s){
+  const isA = side==="a";
+  return `<section class="lane ${side}" aria-label="${isA?"Side A":"Side B"}">
+    <div class="lane-head"><span class="side">${isA?"Side A":"Side B"}</span><span class="stack">LangGraph + ${isA?"AWS Bedrock AgentCore":"Atlas Agent Engine"}</span></div>
+    <div class="lane-body">${s[side].map(evHTML).join("")}</div>
+    <div class="verdict"><span class="label">Outcome</span><span>${isA?s.av:s.bv}</span></div>
+  </section>`;
+}
+
+function pager(id){
+  const i = VIEWS.findIndex(v=>v.id===id);
+  const prev = VIEWS[i-1], next = VIEWS[i+1];
+  return `<div class="pager">${prev?`<button class="btn" data-go="${prev.id}">← ${prev.title}</button>`:"<span></span>"}${next?`<button class="btn primary" data-go="${next.id}">${next.title} →</button>`:""}</div>`;
+}
+
+function renderScene(id){
+  const s = SCENES[id];
+  return `<div class="wrap" style="max-width:none;gap:16px">
+    <div class="scene-head">
+      <div class="txt">
+        <span class="kind ${s.kind}">${s.point} · ${s.kind==="structural"?"Structural advantage":"Feature advantage"}</span>
+        <h2>${s.title}</h2>
+      </div>
+      <div class="btns"><button class="btn" id="replay">Replay scene</button></div>
+    </div>
+    <div class="setup">
+      <div class="box"><span class="label">Situation</span><p>${s.setup}</p></div>
+      <div class="box prompt"><span class="label">Customer asks</span><q>${s.prompt}</q></div>
+    </div>
+    <div class="lanes">${lane("a",s)}${lane("b",s)}</div>
+    <div class="extra">${s.extra}</div>
+    <div class="notes">
+      <div class="box say"><h3>What to say</h3><p>${s.say}</p></div>
+      <div class="box fair"><h3>Keep it fair</h3><p>${s.fair}</p></div>
+    </div>
+    ${pager(id)}
+  </div>`;
+}
+
+function renderOverview(){
+  return `<div class="wrap" style="max-width:none;gap:16px">
+    <div class="scene-head"><div class="txt"><span class="kind feature">Before the scenes</span><h2>Same agent, two platforms</h2>
+      <p class="lede">The LangGraph graph, prompts, tools, model and seed data are identical. Only the runtime and memory layer change.</p></div></div>
+    <div class="arch">
+      <section class="lane a"><div class="lane-head"><span class="side">Side A</span><span class="stack">LangGraph + AWS Bedrock AgentCore</span></div>
+        <div class="lane-body comp">
+          <div class="chip"><span>Agent runtime</span><span class="k">AgentCore Runtime</span></div>
+          <div class="chip"><span>Agent memory</span><span class="k">AgentCore Memory</span></div>
+          <div class="chip"><span>Accounts and cards</span><span class="k">Aurora PostgreSQL</span></div>
+          <div class="chip copy"><span>Card policies + vectors</span><span class="k">Separate vector store</span></div>
+          <div class="chip copy"><span>Keep memory and policies in sync</span><span class="k">CDC + Lambda jobs</span></div>
+          <div class="count">5 systems to run, secure and audit</div>
+        </div></section>
+      <section class="lane b"><div class="lane-head"><span class="side">Side B</span><span class="stack">LangGraph + Atlas Agent Engine</span></div>
+        <div class="lane-body comp">
+          <div class="chip"><span>Agent runtime</span><span class="k">Atlas Agent Runtime</span></div>
+          <div class="chip"><span>Agent memory</span><span class="k">Bank's Atlas cluster</span></div>
+          <div class="chip"><span>Accounts and cards</span><span class="k">Bank's Atlas cluster</span></div>
+          <div class="chip"><span>Card policies + vectors</span><span class="k">Bank's Atlas cluster</span></div>
+          <div class="chip"><span>Staleness logic</span><span class="k">Change stream, same cluster</span></div>
+          <div class="count">2 systems: runtime + one cluster</div>
+        </div></section>
+    </div>
+    <div class="label">Fairness rules for the demo</div>
+    <div class="rules">
+      <div class="rule"><b>Same agent code</b><span>One LangGraph graph. AgentCore via langgraph-checkpoint-aws, Atlas via agent-engine-sdk-langgraph.</span></div>
+      <div class="rule"><b>Same model</b><span>Claude through the Anthropic API on both sides, same prompts and temperature.</span></div>
+      <div class="rule"><b>Same data</b><span>Identical customers, cards and policies seeded into each side's store.</span></div>
+      <div class="rule"><b>Honest status</b><span>Atlas Agent Engine is in public preview. Position this as a POC, not production.</span></div>
+    </div>
+    ${pager("overview")}
+  </div>`;
+}
+
+function renderSummary(){
+  const rows = [
+    ["1","Memory in the bank's own cluster","structural","Managed AWS service; built-in extraction in a service account","Same cluster as customer data, under existing controls","Lead with this for risk and compliance teams"],
+    ["2","Memory joinable with operational data","structural","API-only; cross-system pipeline to catch stale facts","One change stream and one aggregation","Lead with this for architects"],
+    ["3","Procedural memory","feature","Prompt text or a custom store you build","Built-in, stored as data","Supporting point; will become table stakes"],
+    ["4","Taxonomic memory","feature","Glossary in prompt, knowledge base or custom namespace","Built-in, shared project-wide","Supporting point; will become table stakes"],
+    ["5","Ready-made context","feature","Your merge, rank and trim code","build_context() with a token budget","Supporting point; quote only measured tokens"]
+  ];
+  return `<div class="wrap" style="max-width:none;gap:16px">
+    <div class="scene-head"><div class="txt"><span class="kind structural">Wrap-up</span><h2>Scorecard</h2>
+      <p class="lede">Two structural points carry the pitch. Three feature points support it, and competitors can copy them.</p></div></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>#</th><th>Point</th><th>Type</th><th>Side A · AgentCore</th><th>Side B · Atlas</th><th>How to use it</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr><td class="mono">${r[0]}</td><td><b>${r[1]}</b></td><td><span class="kind ${r[2]}">${r[2]}</span></td><td>${r[3]}</td><td>${r[4]}</td><td>${r[5]}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <div class="notes">
+      <div class="box say"><h3>Closing line</h3><p>The gap isn't the database. It's where agent memory lives and what it can be joined with. Keep agent memory next to the data it describes, and the pipelines, copies and audit scope shrink.</p></div>
+      <div class="box fair"><h3>Questions to expect</h3><p>“Is it production ready?” Not yet; it's a public preview. “Do we have to move our core banking system?” No; start with one data slice the agent needs. “What about governance?” AgentCore has strong identity and policy features too; compare those separately.</p></div>
+    </div>
+    ${pager("summary")}
+  </div>`;
+}
+
+function replay(){
+  timers.forEach(clearTimeout); timers=[];
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const lanes = document.querySelectorAll(".lane-body");
+  lanes.forEach(l=>l.querySelectorAll(".ev").forEach(e=>e.classList.add("hide")));
+  lanes.forEach(l=>{
+    l.querySelectorAll(".ev").forEach((e,i)=>{
+      timers.push(setTimeout(()=>e.classList.remove("hide"), reduce?0:350+i*750));
+    });
+  });
+}
+
+function go(id, push=true){
+  if(!VIEWS.some(v=>v.id===id)) id="overview";
+  timers.forEach(clearTimeout); timers=[];
+  renderTabs(id);
+  const html = id==="overview"?renderOverview():id==="summary"?renderSummary():renderScene(id);
+  $("#stage").innerHTML = html;
+  $("#stage").querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>{go(b.dataset.go); window.scrollTo({top:0,behavior:"smooth"});}));
+  const r = $("#replay"); if(r) r.addEventListener("click",replay);
+  if(push){ try{ history.replaceState(null,"","#"+id); }catch(e){} }
+}
+
+document.addEventListener("keydown",e=>{
+  if(e.target.closest("input,textarea")) return;
+  const i = VIEWS.findIndex(v=>v.id===(document.querySelector('.tab[aria-selected="true"]')||{}).dataset?.id);
+  if(e.key==="ArrowRight" && VIEWS[i+1]) go(VIEWS[i+1].id);
+  if(e.key==="ArrowLeft" && VIEWS[i-1]) go(VIEWS[i-1].id);
+});
+
+go((location.hash||"").slice(1)||"overview", false);
+</script>
+
+</body></html>
