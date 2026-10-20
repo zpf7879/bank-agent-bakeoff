@@ -1,0 +1,26 @@
+# Side B: LangGraph card agent on MongoDB Atlas Agent Engine (public preview).
+# Check against the scaffold that `agentengine create` generated and keep any
+# fields it added (for example artifact_repositories).
+name: card-agent
+description: Harbourline card servicing agent for the AgentCore vs Atlas bake-off.
+entrypoint: card_agent.main:app
+
+agent_card:
+  summary: Credit card servicing for Harbourline Bank customers.
+  capabilities: [fee-waivers, limit-requests, disputes, memory]
+
+features:
+  memory: true        # app.memory client; requires VOYAGE_API_KEY project secret
+  guardrails: false
+  playground: true
+
+scaling:
+  replicas: 2
+  agent_idle_ttl_seconds: 900
+
+sandboxes:
+  agent:
+    # Secrets arrive as environment variables. Optional overrides you can add as secrets:
+    # BANK_DB, ANTHROPIC_MODEL, VERIFY_BEFORE_OFFER, MAX_CONTEXT_TOKENS (keep them equal to Side A).
+    secrets: ["ANTHROPIC_API_KEY"]
+    tools: ["*"]      # all tools run in the agent sandbox, same as Side A

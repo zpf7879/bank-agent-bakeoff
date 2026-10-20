@@ -1,0 +1,193 @@
+# Card Agent Bake-off
+
+One LangGraph credit card agent for a fictional bank (Harbourline Bank), deployed twice:
+
+- **Side A**: AWS Bedrock AgentCore Runtime + AgentCore Memory, bank data in Aurora PostgreSQL
+- **Side B**: MongoDB Atlas Agent Engine + its memory, bank data in the same Atlas cluster
+
+Same graph, prompt, tools, model (Claude via the Anthropic API) and seed data. Only the platform changes. The five demo scenes match the click-through simulation.
+
+```
+shared/bakeoff/          the agent: graph, prompt, tools, interfaces   <- edit here only
+data/seed.json           customer, card, dispute, offer, procedures, glossary
+side_a_agentcore/
+  app/card_agent/        AgentCore entrypoint, Aurora + AgentCore Memory adapters
+  scripts/               schema, seeding, memory setup
+  stale_sync/            Scene 2 pipeline: Aurora trigger -> Lambda -> delete memory
+side_b_atlas/
+  project-config.yaml    memory config (all four memory types)
+  agents/card-agent/     agent.yaml, entrypoint, Atlas + memory adapters
+  scripts/               seeding, change-stream watcher, audit join
+demo/                    run scenes on both sides, freeze card, measure context
+scripts/sync_shared.sh   copies shared/bakeoff into both agents and diffs them
+tests/                   offline tests (no cloud needed)
+```
+
+> **Status.** Tested offline only: the shared graph end to end with a scripted model, and both memory adapters against fake clients. Side A API shapes were checked against boto3 1.43. Side B is written against the Atlas Agent Engine docs (public preview) and has not run against the live service. Expect small fixes on first deploy. See [Verify before a customer sees it](#verify-before-a-customer-sees-it).
+
+---
+
+## 0. Prerequisites
+
+| Need | For |
+|---|---|
+| Python 3.11+, Node 20+, Docker | both CLIs, local runs |
+| AWS account + credentials, AgentCore CLI (`npm install -g @aws/agentcore`) | Side A |
+| Atlas account, `agentengine` CLI (download from agentengine.mongodb.com) | Side B |
+| Anthropic API key, Voyage AI key | model on both sides, Atlas memory embeddings |
+
+```bash
+cp .env.example .env    # fill it in as you go
+set -a; source .env; set +a
+pip install -r demo/requirements.txt
+./scripts/sync_shared.sh   # prints "OK: both sides run the same agent code"
+```
+
+**Watch:** `ANTHROPIC_MODEL`, `MAX_CONTEXT_TOKENS` and `VERIFY_BEFORE_OFFER` must be identical on both sides. That's the fairness contract.
+
+---
+
+## 1. Deploy Side A (AgentCore)
+
+**1.1 Check the region.** Confirm AgentCore Runtime and Memory are offered in `ap-southeast-1` (AgentCore console). If not, use the nearest supported region for Side A and say so in the demo.
+
+**1.2 Create the bank database.** Create an Aurora PostgreSQL cluster (database `harbourline`), then:
+```bash
+python side_a_agentcore/scripts/seed_aurora.py --reset
+```
+
+**1.3 Scaffold and drop in the agent.**
+```bash
+agentcore create --project-name CardAgentA --name CardAgent --framework LangChain_LangGraph \
+  --model-provider Anthropic --api-key "$ANTHROPIC_API_KEY" --memory longAndShortTerm \
+  --network-mode VPC --subnets <ids> --security-groups <ids>
+cp -R side_a_agentcore/app/card_agent/* CardAgentA/app/CardAgent/
+```
+Why VPC mode: the runtime must reach Aurora privately.
+**Watch:** keep the scaffold's model loader if it differs from ours. Our `main.py` reads `ANTHROPIC_API_KEY`, or `ANTHROPIC_CREDENTIAL_PROVIDER` (the AgentCore Identity provider name `agentcore add credential` created). Set `BANK_PG_DSN` or `BANK_PG_SECRET_ARN` for the runtime.
+
+**1.4 Deploy, then wire memory.**
+```bash
+cd CardAgentA && agentcore deploy && agentcore status --type memory   # note the memory ID
+cd .. && python side_a_agentcore/scripts/describe_memory.py --memory-id <id>
+cp side_a_agentcore/app/card_agent/memory_config.json CardAgentA/app/CardAgent/
+cd CardAgentA && agentcore deploy
+```
+Why: `describe_memory.py` records which namespace each built-in strategy writes to, and prints the Scene 1 security facts (key type, event expiry).
+**Watch:** the runtime role needs `bedrock-agentcore:RetrieveMemoryRecords`, `ListMemoryRecords`, `BatchCreateMemoryRecords`, `BatchDeleteMemoryRecords` and `CreateEvent` on the memory ARN. Add them if the first scene returns AccessDenied.
+
+**1.5 Seed memory and smoke-test.**
+```bash
+python side_a_agentcore/scripts/seed_memory.py --reset
+export SIDE_A_RUNTIME_ARN=<from agentcore status>
+python demo/run_scene.py --side a --message "Hi, what card do I have?"
+```
+
+**1.6 (Scene 2 only) Stale-memory pipeline.** Deploy `stale_sync/handler.py` as Lambda `card-agent-stale-sync`, attach an IAM role to the Aurora cluster that allows `lambda:InvokeFunction`, then run `stale_sync/aurora_trigger.sql`. Keep it switched off for the first half of Scene 2.
+
+---
+
+## 2. Deploy Side B (Atlas Agent Engine)
+
+**2.1 Scaffold and drop in the agent.**
+```bash
+agentengine auth login
+agentengine create          # Hello World template, Anthropic, memory: yes
+cp side_b_atlas/project-config.yaml <project>/
+cp -R side_b_atlas/agents/card-agent/{agent.yaml,card_agent,bakeoff} <project>/agents/<agent>/
+```
+**Watch:** merge our `pyproject.toml` dependencies into the scaffold's file, and keep its private package index entries. If the scaffold puts code under `src/`, move `card_agent/` and `bakeoff/` there and keep `entrypoint: card_agent.main:app` importable.
+
+**2.2 Link the cluster and set secrets.** From the agent directory:
+```bash
+agentengine init
+agentengine atlas setup                       # pick or create the cluster; stores MONGODB_URI
+agentengine secret set ANTHROPIC_API_KEY
+agentengine secret set VOYAGE_API_KEY --project-scope
+agentengine secret set ANTHROPIC_API_KEY --project-scope   # for memory extraction
+agentengine memory configure
+```
+Use an M10 or larger cluster in AWS Singapore. Database auditing, which Scene 1 relies on, needs a dedicated tier.
+**Watch:** if the deployed agent can't reach the bank collections, run `agentengine atlas link` so the cluster is on the agent's egress policy.
+
+**2.3 Seed and deploy.**
+```bash
+python side_b_atlas/scripts/seed_atlas.py --reset
+agentengine deploy --auto                     # 10 to 20 minutes the first time
+agentengine service-account create bakeoff --role PROJECT_OWNER   # save client ID/secret in .env
+pip install agent-engine-sdk-memory --extra-index-url "https://ignore:$ACCESS_TOKEN@agentengine.mongodb.com/api/v1/packages/python/simple"
+python side_b_atlas/scripts/seed_memory.py    # run once (procedures are create-only)
+```
+
+**2.4 Learn the memory schema (one time).**
+```bash
+python side_b_atlas/scripts/audit_join.py --inspect
+```
+Why: the memory collection layout isn't documented in the preview. Put the semantic collection name, user field and text field into `.env` (`MEMORY_SEMANTIC_COLL`, `MEMORY_USER_FIELD`, `MEMORY_TEXT_FIELD`).
+**Optional:** set `MONGOMEM_DB_NAME=harbourline` before deploying so memory lives in the bank database. Then the Scene 2 audit runs as a single `$lookup`.
+
+**2.5 Smoke-test.** Set `AE_PROJECT_ID` and `AE_WORKSPACE_ID` (from `agentengine workspace list`), then:
+```bash
+python demo/run_scene.py --side b --message "Hi, what card do I have?"
+```
+
+---
+
+## 3. Run the demo
+
+Each scene prints both replies side by side with latency. Scene numbers match the simulation.
+
+**Scene 1 · Where memory lives**
+```bash
+python demo/run_scene.py 1
+python demo/where_memory_lives.py
+```
+Watch: Side A prints two systems (Aurora row, AgentCore records via API). Side B prints the account and the memory documents from one cluster connection.
+
+**Scene 2 · Fraud freeze**
+```bash
+python side_b_atlas/scripts/stale_watcher.py &     # Side B freshness, same cluster
+python demo/freeze_card.py --status frozen
+python demo/run_scene.py 2                         # Side A repeats the stale offer
+python side_b_atlas/scripts/audit_join.py          # one query: held customers whose memory still has an offer
+```
+Then enable the Side A trigger and Lambda (step 1.6), reset with `--status active`, re-seed the offer, and freeze again to show Side A also fixed, at the cost of five extra moving parts.
+For the "obvious challenge", redeploy both sides with `VERIFY_BEFORE_OFFER=true` and compare tool calls and latency.
+Reset afterwards: `python demo/freeze_card.py --status active`, then restore the offer with `seed_memory.py --offer-only` on each side.
+
+**Scene 3 · Fee-waiver procedure**
+```bash
+python demo/run_scene.py 3
+```
+Watch: both should call `find_procedure` then `apply_fee_waiver`. Side A reads it from a namespace you designed; Side B from built-in procedural memory.
+
+**Scene 4 · Bank vocabulary**
+```bash
+python demo/run_scene.py 4
+```
+
+**Scene 5 · Context assembly**
+```bash
+python demo/run_scene.py 5
+python demo/measure_context.py
+```
+Watch: quote these measured tokens and latencies, not the simulation's placeholders.
+
+---
+
+## 4. Verify before a customer sees it
+
+1. **Side B SDK names.** `app.prepare_agent_input`, `app.memory.build_context(max_tokens=...)`, `discover_procedures`, `search_taxonomic(visibility="org")` follow the preview docs. Run `python demo/run_scene.py 3 --side b` early.
+2. **Side B memory identity.** The platform auto-records turns under the caller's identity (the service account). The agent writes customer facts with `user_id=customer_id` explicitly, so customer memory is consistent across sides. Auto-extracted memories won't appear under the customer ID.
+3. **Extraction is asynchronous on both sides.** A fact said in Scene 1 shows up in long-term memory minutes later. Scene 5 relies on the explicit `remember_customer_fact` write, so it works immediately.
+4. **Side A memory ID variable.** `memory_agentcore.py` looks for `AGENTCORE_MEMORY_ID`, `MEMORY_ID`, any `MEMORY_*_ID`, then `memory_config.json`.
+5. **Model ID.** `claude-sonnet-5-5` by default. Check it's available on your Anthropic account.
+6. **Public preview.** Atlas Agent Engine is for evaluation and prototyping, not production. Present this as a POC.
+
+## 5. Tests
+
+```bash
+pip install langgraph langchain-core boto3
+python tests/test_local.py      # shared graph end to end with a scripted model
+python tests/test_adapters.py   # both memory adapters against fake clients
+```

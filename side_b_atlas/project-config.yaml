@@ -1,0 +1,32 @@
+# Side B project-level memory configuration (shared by all agents in the project).
+# Secrets are NOT set here. Upload them with:
+#   agentengine secret set VOYAGE_API_KEY --project-scope
+#   agentengine secret set ANTHROPIC_API_KEY --project-scope
+memory:
+  log_level: info
+
+  voyage:
+    model: "voyage-4-large"
+    dimension: 1024
+
+  short_term:
+    embed_on_write: false
+
+  # Same provider as the agent: Claude through the Anthropic API.
+  extraction_llm:
+    provider: anthropic
+    model: null
+    api_key_secret: ANTHROPIC_API_KEY
+
+  background_extraction:
+    snapshot:
+      max_messages: 20
+      stale_minutes: 3
+
+  # All four built-in long-term types (the docs' list also includes entity and preferences).
+  extraction:
+    enabled:
+      - semantic
+      - episodic
+      - procedural
+      - taxonomic

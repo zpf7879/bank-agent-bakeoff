@@ -1,0 +1,15 @@
+# Merge these dependencies into the pyproject.toml that `agentengine create` generated.
+# Keep the scaffold's [[tool.uv.index]] entries: agent-engine-sdk-langgraph installs
+# from the Atlas Agent Engine private package registry.
+[project]
+name = "card-agent-atlas"
+version = "0.1.0"
+description = "Bake-off Side B: LangGraph card agent on MongoDB Atlas Agent Engine"
+requires-python = ">=3.11"
+dependencies = [
+  "agent-engine-sdk-langgraph",
+  "langgraph>=0.6",
+  "langchain-core>=0.3",
+  "langchain-anthropic>=0.3",
+  "pymongo>=4.8",
+]

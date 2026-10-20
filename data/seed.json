@@ -1,0 +1,83 @@
+{
+  "bank": "Harbourline Bank (fictional)",
+  "customers": [
+    {
+      "customer_id": "C-1001",
+      "name": "Tan Wei Ling",
+      "customer_since": "2022-03-14",
+      "segment": "Platinum",
+      "email": "weiling.tan@example.com",
+      "mailing_address": "18 Jalan Kemaman, Singapore 328271"
+    }
+  ],
+  "accounts": [
+    {
+      "account_id": "CARD-2081",
+      "customer_id": "C-1001",
+      "product": "Harbourline Platinum Visa",
+      "card_last4": "2081",
+      "status": "active",
+      "hold_reason": null,
+      "credit_limit_sgd": 18000,
+      "balance_sgd": 4210.55,
+      "overdue_sgd": 0,
+      "late_fee_sgd": 100,
+      "late_fee_date": "2026-10-03",
+      "last_payment_date": "2026-10-06"
+    }
+  ],
+  "fee_waivers": [],
+  "disputes": [
+    {
+      "dispute_id": "DSP-55012",
+      "customer_id": "C-1001",
+      "merchant": "SkyRoute Travel",
+      "amount_sgd": 642.0,
+      "opened": "2026-10-09",
+      "status": "under_investigation",
+      "provisional_credit_sgd": 642.0
+    }
+  ],
+  "memories": {
+    "offer": {
+      "label": "credit-limit-offer",
+      "kind": "offer",
+      "text": "Customer was pre-qualified on 2026-10-13 for a credit limit increase from SGD 18,000 to SGD 25,000. Customer said they would confirm later."
+    },
+    "facts": [
+      {
+        "label": "contact-preference",
+        "kind": "preference",
+        "text": "Customer prefers email over phone calls for follow-ups."
+      }
+    ]
+  },
+  "procedures": [
+    {
+      "procedure": "late-fee-waiver",
+      "description": "Decide and apply a late-fee waiver on a credit card.",
+      "content": "1. Call check_fee_waiver_eligibility. 2. Waive only if tenure is 12 months or more, there was no waiver in the last 12 months, and the overdue balance is now fully paid. 3. If eligible, call apply_fee_waiver with reason code LFW-01 and tell the customer this uses their one waiver for the next 12 months. 4. If not eligible, explain which rule was not met and offer a reminder setup instead.",
+      "tags": ["cards", "fees"]
+    },
+    {
+      "procedure": "credit-limit-increase",
+      "description": "Handle a customer request to increase their credit limit.",
+      "content": "1. Confirm the new limit the customer wants. 2. Call submit_limit_increase. 3. If the system rejects it, do not reveal internal risk or fraud reasons; say a specialist will contact the customer.",
+      "tags": ["cards", "credit"]
+    }
+  ],
+  "glossary": [
+    {
+      "term": "provisional credit",
+      "definition": "A temporary credit posted to the card while a dispute is investigated. It can be reversed if the dispute is decided in the merchant's favour."
+    },
+    {
+      "term": "chargeback",
+      "definition": "A reversal of a card payment that the issuing bank requests from the merchant's bank on the cardholder's behalf."
+    },
+    {
+      "term": "statement balance",
+      "definition": "The amount owed at the statement closing date. Paying it in full by the due date avoids interest on purchases."
+    }
+  ]
+}
