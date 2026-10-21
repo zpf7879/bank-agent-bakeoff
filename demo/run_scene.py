@@ -34,7 +34,7 @@ WIDTH = 58
 
 
 def column(reply: Reply) -> list[str]:
-    lines = [f"{reply.name}  ({reply.elapsed_ms:,} ms)", "-" * WIDTH]
+    lines = [f"{reply.side}  ({reply.elapsed_ms:,} ms)", "-" * WIDTH]
     if reply.error:
         lines += textwrap.wrap(f"ERROR: {reply.error}", WIDTH)
     else:
