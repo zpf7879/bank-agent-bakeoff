@@ -64,10 +64,11 @@ Connection settings, checked in this order:
 ```bash
 agentcore create --project-name CardAgentA --name CardAgent --framework LangChain_LangGraph \
   --model-provider Anthropic --api-key "$ANTHROPIC_API_KEY" --memory longAndShortTerm \
-  --network-mode VPC --subnets <ids> --security-groups <ids>
+  --network-mode PUBLIC
 cp -R side_a_agentcore/app/card_agent/* CardAgentA/app/CardAgent/
 ```
-Why VPC mode: the runtime must reach Aurora privately. If your cluster has no VPC (Aurora express configuration, reached over the internet with IAM auth), use `--network-mode PUBLIC` and drop `--subnets` and `--security-groups`.
+Why PUBLIC mode: this setup uses Aurora express configuration, which has no VPC. The runtime reaches Aurora over the internet, and IAM database auth (`BANK_PG_IAM_AUTH=true`) is the access control. PUBLIC mode also reaches the Anthropic API and AgentCore Memory with no NAT gateway.
+**If your Aurora cluster is in a VPC** (`aws rds describe-db-clusters` shows a `DBSubnetGroup`), use `--network-mode VPC --subnets <private subnet ids> --security-groups <agent sg>` instead. Allow TCP 5432 from the agent security group in Aurora's security group, and give the subnets a NAT gateway so the runtime can still call the Anthropic API.
 **Watch:** keep the scaffold's model loader if it differs from ours. Our `main.py` reads `ANTHROPIC_API_KEY`, or `ANTHROPIC_CREDENTIAL_PROVIDER` (the AgentCore Identity provider name `agentcore add credential` created). Give the runtime the same `BANK_PG_*` settings as your `.env`. With IAM auth, also grant the runtime role `rds-db:connect`.
 
 **1.4 Deploy, then wire memory.**
