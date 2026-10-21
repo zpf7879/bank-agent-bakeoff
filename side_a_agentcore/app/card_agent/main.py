@@ -23,7 +23,7 @@ from bank_aurora import AuroraBank
 from memory_agentcore import AgentCoreMemory
 
 log = logging.getLogger("card_agent")
-REGION = os.getenv("AWS_REGION", "ap-southeast-1")
+REGION = (os.getenv("AWS_REGION") or "ap-southeast-1")
 MODEL = os.getenv("ANTHROPIC_MODEL", DEFAULT_MODEL)
 
 app = BedrockAgentCoreApp()

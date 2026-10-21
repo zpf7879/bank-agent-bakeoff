@@ -25,7 +25,7 @@ def _iam_dsn() -> str:
     host = os.environ["BANK_PG_HOST"]
     port = int(os.getenv("BANK_PG_PORT", "5432"))
     user = os.getenv("BANK_PG_USER", "postgres")
-    region = os.getenv("AWS_REGION", "ap-southeast-1")
+    region = (os.getenv("AWS_REGION") or "ap-southeast-1")
     token = boto3.client("rds", region_name=region).generate_db_auth_token(
         DBHostname=host, Port=port, DBUsername=user, Region=region
     )

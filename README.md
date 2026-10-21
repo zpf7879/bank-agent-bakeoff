@@ -87,7 +87,7 @@ Run this in a WSL/Linux home directory if you can: `uv` installs are very slow o
 ],
 "additionalPolicies": ["runtime-policy.json"]
 ```
-Use the same values as your `.env`. Then copy `side_a_agentcore/runtime-policy.example.json` to `CardAgentA/app/CardAgent/runtime-policy.json` and fill in the placeholders (`<cluster-resource-id>` comes from `aws rds describe-db-clusters --query 'DBClusters[0].DbClusterResourceId'`). It grants `rds-db:connect` for IAM database auth, and `BatchCreateMemoryRecords` / `BatchDeleteMemoryRecords`, which the scaffold's role lacks. Check with `agentcore validate`.
+Use the same values as your `.env`. Then copy `side_a_agentcore/runtime-policy.example.json` to `CardAgentA/app/CardAgent/runtime-policy.json` and fill in the placeholders (`<cluster-resource-id>` comes from `aws rds describe-db-clusters --query 'DBClusters[0].DbClusterResourceId'`). It grants `rds-db:connect` for IAM database auth, and `BatchCreateMemoryRecords` / `BatchDeleteMemoryRecords`, which the scaffold's role lacks. It also lets the agent read the `/bakeoff/*` namespaces (facts it writes, procedures, glossary) and `/episodes/<customer>`: the scaffold only allows reads from its own strategy namespaces, so without this every turn fails with AccessDenied on `RetrieveMemoryRecords`. Check with `agentcore validate`.
 
 **1.4 Deploy, then wire memory.**
 ```bash
@@ -97,7 +97,7 @@ cp side_a_agentcore/app/card_agent/memory_config.json CardAgentA/app/CardAgent/
 cd CardAgentA && agentcore deploy
 ```
 Why: `describe_memory.py` records which namespace each built-in strategy writes to, and prints the Scene 1 security facts (key type, event expiry).
-**Watch:** if a deploy step fails with "security token included in the request is expired", run `aws login` (or `aws sso login`) and deploy again. If boto3 asks for `botocore[crt]`, run `pip install -r demo/requirements.txt` again.
+**Watch:** if a deploy step fails with "security token included in the request is expired", run `aws login` (or `aws sso login`) and deploy again. If scripts fail with "You must specify a region" even though `AWS_REGION` is set, run `aws configure set region ap-southeast-1` (or set `AWS_DEFAULT_REGION`): boto3 refreshes `aws login` credentials with the default region, not `AWS_REGION`. If boto3 asks for `botocore[crt]`, run `pip install -r demo/requirements.txt` again.
 **Watch:** the runtime role needs `bedrock-agentcore:RetrieveMemoryRecords`, `ListMemoryRecords`, `BatchCreateMemoryRecords`, `BatchDeleteMemoryRecords` and `CreateEvent` on the memory ARN. Step 1.3b covers the two the scaffold lacks. Add any others if the first scene returns AccessDenied.
 
 **1.5 Seed memory and smoke-test.**

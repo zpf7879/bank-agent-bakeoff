@@ -60,7 +60,7 @@ class AgentCoreMemory:
         cfg = _load_config()
         self.memory_id: str = cfg["memory_id"]
         self.ns: dict[str, str] = cfg["namespaces"]
-        self.client = boto3.client("bedrock-agentcore", region_name=region or os.getenv("AWS_REGION", "ap-southeast-1"))
+        self.client = boto3.client("bedrock-agentcore", region_name=region or (os.getenv("AWS_REGION") or "ap-southeast-1"))
         self.max_context_tokens = max_context_tokens or int(os.getenv("MAX_CONTEXT_TOKENS", "1500"))
 
     # ---------- helpers ----------

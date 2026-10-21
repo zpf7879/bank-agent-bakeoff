@@ -54,7 +54,7 @@ def main() -> None:
     p.add_argument("--memory-id")
     p.add_argument("--create", action="store_true")
     p.add_argument("--kms-key-arn")
-    p.add_argument("--region", default=os.getenv("AWS_REGION", "ap-southeast-1"))
+    p.add_argument("--region", default=(os.getenv("AWS_REGION") or "ap-southeast-1"))
     args = p.parse_args()
 
     ctl = boto3.client("bedrock-agentcore-control", region_name=args.region)

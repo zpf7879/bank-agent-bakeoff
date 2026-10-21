@@ -47,7 +47,7 @@ def side_a() -> None:
             records.append({"namespace": key, "text": (rec.get("content") or {}).get("text", "")[:90]})
     show("System 2 · AgentCore Memory · records (via API only)", records)
 
-    ctl = boto3.client("bedrock-agentcore-control", region_name=os.getenv("AWS_REGION", "ap-southeast-1"))
+    ctl = boto3.client("bedrock-agentcore-control", region_name=(os.getenv("AWS_REGION") or "ap-southeast-1"))
     m = ctl.get_memory(memoryId=mem.memory_id)["memory"]
     show("AgentCore Memory settings", {
         "customer_managed_key": m.get("encryptionKeyArn") or "none (service-managed key)",

@@ -30,7 +30,7 @@ class SideA:
         import boto3
 
         self.arn = os.environ["SIDE_A_RUNTIME_ARN"]
-        self.client = boto3.client("bedrock-agentcore", region_name=os.getenv("AWS_REGION", "ap-southeast-1"))
+        self.client = boto3.client("bedrock-agentcore", region_name=(os.getenv("AWS_REGION") or "ap-southeast-1"))
 
     def ask(self, message: str, session_id: str, customer_id: str) -> Reply:
         started = time.perf_counter()

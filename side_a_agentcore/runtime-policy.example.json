@@ -15,6 +15,40 @@
         "bedrock-agentcore:BatchDeleteMemoryRecords"
       ],
       "Resource": "arn:aws:bedrock-agentcore:<region>:<account-id>:memory/*"
+    },
+    {
+      "Sid": "MemoryReadsDemoNamespaces",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock-agentcore:ListMemoryRecords",
+        "bedrock-agentcore:RetrieveMemoryRecords"
+      ],
+      "Resource": "arn:aws:bedrock-agentcore:<region>:<account-id>:memory/*",
+      "Condition": {
+        "StringLike": {
+          "bedrock-agentcore:namespace": [
+            "/bakeoff/*",
+            "/episodes/*"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "MemoryReadsDemoNamespacePaths",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock-agentcore:ListMemoryRecords",
+        "bedrock-agentcore:RetrieveMemoryRecords"
+      ],
+      "Resource": "arn:aws:bedrock-agentcore:<region>:<account-id>:memory/*",
+      "Condition": {
+        "StringLike": {
+          "bedrock-agentcore:namespacePath": [
+            "/bakeoff/*",
+            "/episodes/*"
+          ]
+        }
+      }
     }
   ]
 }

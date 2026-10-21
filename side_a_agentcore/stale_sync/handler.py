@@ -21,7 +21,7 @@ import os
 import boto3
 
 MEMORY_ID = os.environ["AGENTCORE_MEMORY_ID"]
-client = boto3.client("bedrock-agentcore", region_name=os.getenv("AWS_REGION", "ap-southeast-1"))
+client = boto3.client("bedrock-agentcore", region_name=(os.getenv("AWS_REGION") or "ap-southeast-1"))
 DIRECT_NS = "/bakeoff/facts/{actorId}/"
 EXTRACTED_NS = os.getenv("FACT_NAMESPACES", "/facts/{actorId}/,/preferences/{actorId}/").split(",")
 OFFER_QUERY = "credit limit increase offer pre-qualified"
