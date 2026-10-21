@@ -29,13 +29,13 @@ def show(title: str, obj) -> None:
 
 def side_a() -> None:
     import boto3
-    import psycopg
     from psycopg.rows import dict_row
 
+    from bank_aurora import connect
     from memory_agentcore import AgentCoreMemory
 
     print("\n=== Side A · AgentCore ===")
-    with psycopg.connect(os.environ["BANK_PG_DSN"], row_factory=dict_row) as conn:
+    with connect(row_factory=dict_row) as conn:
         row = conn.execute("SELECT account_id, status, credit_limit_sgd FROM accounts WHERE customer_id = %s",
                            (CUSTOMER_ID,)).fetchone()
     show("System 1 · Aurora PostgreSQL · accounts row", row)

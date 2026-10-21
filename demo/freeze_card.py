@@ -5,22 +5,26 @@ Usage:
   python demo/freeze_card.py --status active   # reset after the scene
   python demo/freeze_card.py --status frozen --side a
 
-Side A: UPDATE in Aurora (BANK_PG_DSN). Fires the stale-sync trigger if you installed it.
+Side A: UPDATE in Aurora (BANK_PG_* settings). Fires the stale-sync trigger if you installed it.
 Side B: update in Atlas (MONGODB_URI). The change stream watcher reacts if it is running.
 """
 from __future__ import annotations
 
 import argparse
 import os
+import sys
 from datetime import datetime
+from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "side_a_agentcore" / "app" / "card_agent"))
 CUSTOMER_ID = "C-1001"
 
 
 def side_a(status: str) -> None:
-    import psycopg
+    from bank_aurora import connect
 
-    with psycopg.connect(os.environ["BANK_PG_DSN"]) as conn:
+    with connect() as conn:
         conn.execute(
             "UPDATE accounts SET status = %s, hold_reason = %s, updated_at = now() WHERE customer_id = %s",
             (status, "fraud review" if status != "active" else None, CUSTOMER_ID),

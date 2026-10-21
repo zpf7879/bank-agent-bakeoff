@@ -1,19 +1,19 @@
 """Create tables and load data/seed.json into Aurora PostgreSQL (Side A).
 
-Usage:
-  export BANK_PG_DSN="host=... port=5432 dbname=harbourline user=... password=... sslmode=require"
+Usage (connection settings come from .env: BANK_PG_IAM_AUTH + BANK_PG_HOST, or BANK_PG_DSN):
   python side_a_agentcore/scripts/seed_aurora.py [--reset]
 """
 from __future__ import annotations
 
 import argparse
 import json
-import os
+import sys
 from pathlib import Path
 
-import psycopg
-
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "side_a_agentcore" / "app" / "card_agent"))
+
+from bank_aurora import connect  # noqa: E402
 
 
 def main() -> None:
@@ -24,7 +24,7 @@ def main() -> None:
     seed = json.loads((ROOT / "data" / "seed.json").read_text())
     schema = (Path(__file__).with_name("schema.sql")).read_text()
 
-    with psycopg.connect(os.environ["BANK_PG_DSN"]) as conn:
+    with connect() as conn:
         conn.execute(schema)
         if args.reset:
             conn.execute("TRUNCATE limit_requests, fee_waivers, disputes, accounts, customers CASCADE")

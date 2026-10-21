@@ -51,10 +51,14 @@ pip install -r demo/requirements.txt
 
 **1.1 Check the region.** Confirm AgentCore Runtime and Memory are offered in `ap-southeast-1` (AgentCore console). If not, use the nearest supported region for Side A and say so in the demo.
 
-**1.2 Create the bank database.** Create an Aurora PostgreSQL cluster (database `harbourline`), then:
+**1.2 Create the bank database.** Create an Aurora PostgreSQL cluster (database `harbourline`), put its connection settings in `.env`, then:
 ```bash
 python side_a_agentcore/scripts/seed_aurora.py --reset
 ```
+Connection settings, checked in this order:
+- `BANK_PG_IAM_AUTH=true` with `BANK_PG_HOST` (plus optional `BANK_PG_PORT`, `BANK_PG_DBNAME`, `BANK_PG_USER`): IAM database auth. A fresh token is generated for every connection, so nothing expires mid-demo. Whoever connects needs `rds-db:connect` on `arn:aws:rds-db:<region>:<account>:dbuser:<cluster-resource-id>/<user>`, and the user needs `GRANT rds_iam TO <user>;`.
+- `BANK_PG_DSN`: a full connection string with a password. Quote it in `.env`.
+- `BANK_PG_SECRET_ARN`: a Secrets Manager secret with `host`, `username`, `password`.
 
 **1.3 Scaffold and drop in the agent.**
 ```bash
@@ -63,8 +67,8 @@ agentcore create --project-name CardAgentA --name CardAgent --framework LangChai
   --network-mode VPC --subnets <ids> --security-groups <ids>
 cp -R side_a_agentcore/app/card_agent/* CardAgentA/app/CardAgent/
 ```
-Why VPC mode: the runtime must reach Aurora privately.
-**Watch:** keep the scaffold's model loader if it differs from ours. Our `main.py` reads `ANTHROPIC_API_KEY`, or `ANTHROPIC_CREDENTIAL_PROVIDER` (the AgentCore Identity provider name `agentcore add credential` created). Set `BANK_PG_DSN` or `BANK_PG_SECRET_ARN` for the runtime.
+Why VPC mode: the runtime must reach Aurora privately. If your cluster has no VPC (Aurora express configuration, reached over the internet with IAM auth), use `--network-mode PUBLIC` and drop `--subnets` and `--security-groups`.
+**Watch:** keep the scaffold's model loader if it differs from ours. Our `main.py` reads `ANTHROPIC_API_KEY`, or `ANTHROPIC_CREDENTIAL_PROVIDER` (the AgentCore Identity provider name `agentcore add credential` created). Give the runtime the same `BANK_PG_*` settings as your `.env`. With IAM auth, also grant the runtime role `rds-db:connect`.
 
 **1.4 Deploy, then wire memory.**
 ```bash
