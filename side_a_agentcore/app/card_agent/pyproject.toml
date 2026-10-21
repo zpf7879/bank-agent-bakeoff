@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "Bake-off Side A: LangGraph card agent on Amazon Bedrock AgentCore"
 requires-python = ">=3.11"
 dependencies = [
+  # The runtime launches the agent under OpenTelemetry instrumentation; without these the deploy fails.
+  "aws-opentelemetry-distro~=0.18.0",
+  "opentelemetry-instrumentation-langchain>=0.59.0",
   "bedrock-agentcore",
   "boto3>=1.40",
   "langgraph>=0.6",

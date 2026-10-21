@@ -69,17 +69,36 @@ cp -R side_a_agentcore/app/card_agent/* CardAgentA/app/CardAgent/
 ```
 Why PUBLIC mode: this setup uses Aurora express configuration, which has no VPC. The runtime reaches Aurora over the internet, and IAM database auth (`BANK_PG_IAM_AUTH=true`) is the access control. PUBLIC mode also reaches the Anthropic API and AgentCore Memory with no NAT gateway.
 **If your Aurora cluster is in a VPC** (`aws rds describe-db-clusters` shows a `DBSubnetGroup`), use `--network-mode VPC --subnets <private subnet ids> --security-groups <agent sg>` instead. Allow TCP 5432 from the agent security group in Aurora's security group, and give the subnets a NAT gateway so the runtime can still call the Anthropic API.
-**Watch:** keep the scaffold's model loader if it differs from ours. Our `main.py` reads `ANTHROPIC_API_KEY`, or `ANTHROPIC_CREDENTIAL_PROVIDER` (the AgentCore Identity provider name `agentcore add credential` created). Give the runtime the same `BANK_PG_*` settings as your `.env`. With IAM auth, also grant the runtime role `rds-db:connect`.
+Run this in a WSL/Linux home directory if you can: `uv` installs are very slow on `/mnt/c`.
+**Watch:** the `cp` replaces the scaffold's `pyproject.toml`. Ours keeps the two OpenTelemetry packages (`aws-opentelemetry-distro`, `opentelemetry-instrumentation-langchain`); without them the runtime fails with "OpenTelemetry instrumentation executable not found". If you edit `pyproject.toml`, keep them.
+**Watch:** the Anthropic key. `main.py` reads `ANTHROPIC_API_KEY`, then `ANTHROPIC_CREDENTIAL_PROVIDER`, then the credential provider `agentcore create --api-key` declared (the CLI passes its name as `CREDENTIAL_<NAME>_NAME`), so the scaffold's key works with no extra setting.
+
+**1.3b Give the runtime its settings and permissions.** In `CardAgentA/agentcore/agentcore.json`, add to the runtime entry:
+```json
+"envVars": [
+  { "name": "ANTHROPIC_MODEL", "value": "claude-sonnet-5-5" },
+  { "name": "MAX_CONTEXT_TOKENS", "value": "1500" },
+  { "name": "VERIFY_BEFORE_OFFER", "value": "false" },
+  { "name": "BANK_PG_IAM_AUTH", "value": "true" },
+  { "name": "BANK_PG_HOST", "value": "<aurora endpoint>" },
+  { "name": "BANK_PG_PORT", "value": "5432" },
+  { "name": "BANK_PG_DBNAME", "value": "harbourline" },
+  { "name": "BANK_PG_USER", "value": "postgres" }
+],
+"additionalPolicies": ["runtime-policy.json"]
+```
+Use the same values as your `.env`. Then copy `side_a_agentcore/runtime-policy.example.json` to `CardAgentA/app/CardAgent/runtime-policy.json` and fill in the placeholders (`<cluster-resource-id>` comes from `aws rds describe-db-clusters --query 'DBClusters[0].DbClusterResourceId'`). It grants `rds-db:connect` for IAM database auth, and `BatchCreateMemoryRecords` / `BatchDeleteMemoryRecords`, which the scaffold's role lacks. Check with `agentcore validate`.
 
 **1.4 Deploy, then wire memory.**
 ```bash
-cd CardAgentA && agentcore deploy && agentcore status --type memory   # note the memory ID
-cd .. && python side_a_agentcore/scripts/describe_memory.py --memory-id <id>
+cd CardAgentA && agentcore deploy && agentcore status --type memory   # note the memory ID or ARN
+cd .. && python side_a_agentcore/scripts/describe_memory.py --memory-id <id or ARN>
 cp side_a_agentcore/app/card_agent/memory_config.json CardAgentA/app/CardAgent/
 cd CardAgentA && agentcore deploy
 ```
 Why: `describe_memory.py` records which namespace each built-in strategy writes to, and prints the Scene 1 security facts (key type, event expiry).
-**Watch:** the runtime role needs `bedrock-agentcore:RetrieveMemoryRecords`, `ListMemoryRecords`, `BatchCreateMemoryRecords`, `BatchDeleteMemoryRecords` and `CreateEvent` on the memory ARN. Add them if the first scene returns AccessDenied.
+**Watch:** if a deploy step fails with "security token included in the request is expired", run `aws login` (or `aws sso login`) and deploy again. If boto3 asks for `botocore[crt]`, run `pip install -r demo/requirements.txt` again.
+**Watch:** the runtime role needs `bedrock-agentcore:RetrieveMemoryRecords`, `ListMemoryRecords`, `BatchCreateMemoryRecords`, `BatchDeleteMemoryRecords` and `CreateEvent` on the memory ARN. Step 1.3b covers the two the scaffold lacks. Add any others if the first scene returns AccessDenied.
 
 **1.5 Seed memory and smoke-test.**
 ```bash

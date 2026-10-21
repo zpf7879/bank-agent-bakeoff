@@ -1,5 +1,6 @@
 # Laptop-side tools for seeding, running scenes and measuring.
-boto3>=1.43
+# [crt] is needed when your AWS credentials come from `aws login`.
+boto3[crt]>=1.43
 httpx>=0.27
 pymongo>=4.8
 psycopg[binary]>=3.2

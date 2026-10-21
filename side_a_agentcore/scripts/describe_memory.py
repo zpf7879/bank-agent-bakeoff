@@ -61,6 +61,7 @@ def main() -> None:
     memory_id = args.memory_id or (create_memory(ctl, args.kms_key_arn) if args.create else None)
     if not memory_id:
         raise SystemExit("Pass --memory-id (see `agentcore status --type memory`) or --create")
+    memory_id = memory_id.rsplit("/", 1)[-1]  # accept the full ARN as well as the bare ID
 
     mem = ctl.get_memory(memoryId=memory_id)["memory"]
     namespaces: dict[str, str] = {}
@@ -69,7 +70,7 @@ def main() -> None:
         templates = s.get("namespaceTemplates") or s.get("namespaces") or []
         if key and templates:
             # Read at actor level: drop the {sessionId} segment so retrieval spans sessions.
-            namespaces[key] = templates[0].replace("{sessionId}/", "")
+            namespaces[key] = templates[0].replace("/{sessionId}", "")
 
     OUT.write_text(json.dumps({"memory_id": memory_id, "namespaces": namespaces}, indent=2))
     print(f"Wrote {OUT}")

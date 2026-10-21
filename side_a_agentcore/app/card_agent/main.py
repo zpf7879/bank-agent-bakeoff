@@ -33,14 +33,16 @@ _state: dict = {}
 def _anthropic_key() -> str:
     """Same model and provider as Side B: Claude through the Anthropic API.
 
-    Preferred: keep the model loader that `agentcore create --model-provider Anthropic`
-    generated and pass its key here. Fallbacks: ANTHROPIC_API_KEY, or an AgentCore
-    Identity API-key credential provider named in ANTHROPIC_CREDENTIAL_PROVIDER.
+    Order: ANTHROPIC_API_KEY, then an AgentCore Identity API-key credential provider named
+    in ANTHROPIC_CREDENTIAL_PROVIDER, then the one `agentcore create --model-provider Anthropic`
+    declared (the CLI injects its name as CREDENTIAL_<NAME>_NAME; match loosely).
     """
     key = os.getenv("ANTHROPIC_API_KEY")
     if key:
         return key
-    provider = os.getenv("ANTHROPIC_CREDENTIAL_PROVIDER")
+    provider = os.getenv("ANTHROPIC_CREDENTIAL_PROVIDER") or next(
+        (v for k, v in os.environ.items() if k.startswith("CREDENTIAL_") and k.endswith("_NAME") and v), None
+    )
     if provider:
         from bedrock_agentcore.identity.auth import requires_api_key
 

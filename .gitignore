@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .venv/
 .pytest_cache/
+# Generated per deployment: the AgentCore project and its memory wiring.
+CardAgentA/
+side_a_agentcore/app/card_agent/memory_config.json

@@ -1,0 +1,20 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AuroraIamAuth",
+      "Effect": "Allow",
+      "Action": "rds-db:connect",
+      "Resource": "arn:aws:rds-db:<region>:<account-id>:dbuser:<cluster-resource-id>/<db-user>"
+    },
+    {
+      "Sid": "MemoryRecordWrites",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock-agentcore:BatchCreateMemoryRecords",
+        "bedrock-agentcore:BatchDeleteMemoryRecords"
+      ],
+      "Resource": "arn:aws:bedrock-agentcore:<region>:<account-id>:memory/*"
+    }
+  ]
+}
