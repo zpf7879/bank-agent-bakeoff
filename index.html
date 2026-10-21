@@ -153,8 +153,42 @@ td .kind{white-space:nowrap}
   .bar-row{grid-template-columns:96px minmax(0,1fr) 56px}
 }
 @media (prefers-reduced-motion:reduce){ .ev{transition:none} }
+
+/* Page is the simulation plus the MongoDB monitor plugin, side by side. */
+.app-shell{display:grid; grid-template-columns:minmax(0,1fr) minmax(300px,400px); gap:18px; align-items:start}
+.app-shell>.wrap{max-width:none; margin:0}
+.mongo-dock{
+  position:sticky; top:16px; height:calc(100vh - 32px);
+  display:flex; flex-direction:column; min-width:0;
+  border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--surface);
+}
+.mongo-head{background:var(--b); color:#fff; padding:14px 16px; display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex:0 0 auto}
+.mongo-head h2{font-size:18px}
+.mongo-sub{font-family:var(--f-mono); font-size:12px; opacity:.85; margin-top:3px}
+.mongo-count{font-family:var(--f-mono); font-size:12px; background:rgba(255,255,255,.18); color:#fff; padding:2px 8px; border-radius:999px; align-self:center}
+.mongo-body{flex:1; min-height:0; overflow:auto; padding:12px; display:flex; flex-direction:column; gap:10px}
+@media (max-width:1100px){
+  .app-shell{grid-template-columns:minmax(0,1fr)}
+  .mongo-dock{position:relative; top:0; height:70vh}
+}
+.mq-intro{color:var(--muted); font-size:13.5px}
+.mq-intro b{color:var(--ink); font-weight:600}
+.mq-card{background:var(--surface); border:1px solid var(--line); border-radius:6px; overflow:hidden}
+.mq-top{display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 10px; background:var(--sunk)}
+.mq-src{font-family:var(--f-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; padding:2px 6px; border-radius:3px; font-weight:500}
+.mq-src.bank{background:var(--b-soft); color:var(--b)}
+.mq-src.memory{background:var(--a-soft); color:var(--a)}
+.mq-src.audit{background:var(--warn-soft); color:var(--warn)}
+.mq-src.stream{background:var(--surface); color:var(--muted); border:1px solid var(--line)}
+.mq-op{font-family:var(--f-mono); font-size:12px}
+.mq-meta{margin-left:auto; font-family:var(--f-mono); font-size:11px; color:var(--muted)}
+.mq-label{padding:8px 10px 0; font-size:13.5px}
+.mq-note{padding:0 10px 8px; color:var(--muted); font-size:12.5px}
+.mq-shell{margin:0; border-radius:0; max-height:240px}
+.mq-copy{font:inherit; font-size:12px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:4px; padding:3px 8px; cursor:pointer}
 </style>
 
+<div class="app-shell">
 <div class="wrap">
   <header>
     <span class="label">Banking demo · Simulation · Not live output</span>
@@ -166,6 +200,7 @@ td .kind{white-space:nowrap}
       <span class="fact">Card <b>Platinum ending 2081</b></span>
       <span class="fact">Region <b>Singapore</b></span>
       <span class="fact">Model <b>Claude, same on both sides</b></span>
+      <span class="fact">Queries <b>MongoDB monitor, on the right</b></span>
     </div>
   </header>
 
@@ -173,9 +208,12 @@ td .kind{white-space:nowrap}
 
   <main id="stage" aria-live="polite"></main>
 
-  <p class="footer-note">Simulated transcripts and traces for discussion. Atlas Agent Engine is in public preview; memory collection names, field names and token counts shown here are illustrative and must be confirmed in the real build.</p>
+  <p class="footer-note">Simulated transcripts and traces for discussion. Atlas Agent Engine is in public preview; memory collection names, field names and token counts shown here are illustrative and must be confirmed in the real build. The panel on the right is the MongoDB monitor: the commands that scene runs on Side B.</p>
+</div>
+<aside id="mongo-monitor" class="mongo-dock" aria-label="MongoDB monitor"></aside>
 </div>
 
+<script src="monitor.js"></script>
 <script>
 const VIEWS = [
   {id:"overview", n:"0", title:"Setup"},
@@ -510,6 +548,8 @@ function replay(){
       timers.push(setTimeout(()=>e.classList.remove("hide"), reduce?0:350+i*750));
     });
   });
+  const tab = document.querySelector('.tab[aria-selected="true"]');
+  if(tab && window.MongoMonitor) MongoMonitor.show(tab.dataset.id);
 }
 
 function go(id, push=true){
@@ -521,6 +561,7 @@ function go(id, push=true){
   $("#stage").querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>{go(b.dataset.go); window.scrollTo({top:0,behavior:"smooth"});}));
   const r = $("#replay"); if(r) r.addEventListener("click",replay);
   if(push){ try{ history.replaceState(null,"","#"+id); }catch(e){} }
+  if(window.MongoMonitor) MongoMonitor.show(id);
 }
 
 document.addEventListener("keydown",e=>{
