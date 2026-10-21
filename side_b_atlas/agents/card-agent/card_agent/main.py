@@ -60,7 +60,8 @@ def prepare(agent_input: Any, ctx: Any) -> dict[str, Any]:
 
 @app.entrypoint
 def build_agent():
-    llm = app.llm(ChatAnthropic(model=MODEL, max_tokens=1024, temperature=0))
+    # No temperature: claude-sonnet-5-5 rejects non-default values. Keep this identical to Side A.
+    llm = app.llm(ChatAnthropic(model=MODEL, max_tokens=1024))
     llm_with_tools = llm.bind_tools(app.get_tool_schemas())
     return build_graph(llm_with_tools, ToolNode(app.get_tools()), memory, app.checkpointer())
 

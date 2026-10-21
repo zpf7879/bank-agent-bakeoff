@@ -60,7 +60,8 @@ def _setup() -> None:
     memory = AgentCoreMemory(region=REGION)
     bank = AuroraBank()
     tools = [lc_tool(fn) for fn in make_tool_functions(bank, memory)]
-    llm = ChatAnthropic(model=MODEL, api_key=_anthropic_key(), max_tokens=1024, temperature=0)
+    # No temperature: claude-sonnet-5-5 rejects non-default values. Keep this identical to Side B.
+    llm = ChatAnthropic(model=MODEL, api_key=_anthropic_key(), max_tokens=1024)
     checkpointer = AgentCoreMemorySaver(memory.memory_id, region_name=REGION)
     _state.update(
         memory=memory,
