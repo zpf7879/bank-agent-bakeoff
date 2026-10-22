@@ -33,7 +33,7 @@ tests/                   offline tests (no cloud needed)
 |---|---|
 | Python 3.11+, Node 20+, Docker | both CLIs, local runs |
 | AWS account + credentials, AgentCore CLI (`npm install -g @aws/agentcore`) | Side A |
-| Atlas account, `agentengine` CLI (download from agentengine.mongodb.com) | Side B |
+| Atlas account, `agentengine` CLI (see step 2.0) | Side B |
 | Anthropic API key, Voyage AI key | model on both sides, Atlas memory embeddings |
 
 ```bash
@@ -113,10 +113,22 @@ python demo/run_scene.py --side a --message "Hi, what card do I have?"
 
 ## 2. Deploy Side B (Atlas Agent Engine)
 
+**2.0 Install the `agentengine` CLI.** It isn't on npm or pip. Sign in at https://agentengine.mongodb.com/download-cli, pick **Linux x86_64** (also for WSL; there's no Windows build) and copy the SHA-256 checksum the page shows. Then:
+```bash
+cd ~/Downloads                    # WSL with a Windows browser: /mnt/c/Users/<you>/Downloads
+sha256sum agentengine             # must match the checksum on the download page
+chmod +x agentengine
+mkdir -p ~/.local/bin && mv agentengine ~/.local/bin/
+echo "$PATH" | tr ':' '\n' | grep -qx "$HOME/.local/bin" \
+  || { echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc; source ~/.bashrc; }
+agentengine version
+```
+**Watch:** the CLI needs Docker with Compose v2 (`docker compose version`). With Docker Desktop on Windows, turn on WSL integration for your distro. In WSL, log in with `agentengine auth login --no-browser` and open the printed URL in your Windows browser.
+
 **2.1 Scaffold and drop in the agent.**
 ```bash
 agentengine auth login
-agentengine create          # Hello World template, Anthropic, memory: yes
+agentengine create          # LangGraph + Python, Hello World template, Anthropic, memory: yes
 cp side_b_atlas/project-config.yaml <project>/
 cp -R side_b_atlas/agents/card-agent/{agent.yaml,card_agent,bakeoff} <project>/agents/<agent>/
 ```
