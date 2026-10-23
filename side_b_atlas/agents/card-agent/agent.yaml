@@ -1,26 +1,40 @@
 # Side B: LangGraph card agent on MongoDB Atlas Agent Engine (public preview).
-# Check against the scaffold that `agentengine create` generated and keep any
-# fields it added (for example artifact_repositories).
+# Merge into the agent.yaml that `agentengine create` generated: keep its `name`
+# (the slug the platform registered) and `version`, and take everything else from here.
 name: card-agent
-description: Harbourline card servicing agent for the AgentCore vs Atlas bake-off.
+# card_agent/ and bakeoff/ go under the scaffold's src/; no `src.` prefix here.
 entrypoint: card_agent.main:app
-
-agent_card:
-  summary: Credit card servicing for Harbourline Bank customers.
-  capabilities: [fee-waivers, limit-requests, disputes, memory]
+framework: langgraph
 
 features:
-  memory: true        # app.memory client; requires VOYAGE_API_KEY project secret
-  guardrails: false
-  playground: true
+    durable_workflow: true
+    memory: true        # app.memory client; requires the VOYAGE_API_KEY secret
+    guardrails: false
 
-scaling:
-  replicas: 2
-  agent_idle_ttl_seconds: 900
-
+# All tools run in the agent sandbox, same as Side A, where tools run inside the runtime.
+# Secrets arrive as environment variables. Optional overrides you can add as secrets:
+# BANK_DB, ANTHROPIC_MODEL, VERIFY_BEFORE_OFFER, MAX_CONTEXT_TOKENS (keep them equal to Side A).
 sandboxes:
-  agent:
-    # Secrets arrive as environment variables. Optional overrides you can add as secrets:
-    # BANK_DB, ANTHROPIC_MODEL, VERIFY_BEFORE_OFFER, MAX_CONTEXT_TOKENS (keep them equal to Side A).
-    secrets: ["ANTHROPIC_API_KEY"]
-    tools: ["*"]      # all tools run in the agent sandbox, same as Side A
+    agent:
+        secrets: ["*"]
+        tools:
+            - get_account_status
+            - submit_limit_increase
+            - check_fee_waiver_eligibility
+            - apply_fee_waiver
+            - get_dispute_status
+            - remember_customer_fact
+            - find_procedure
+            - define_bank_term
+    tool:
+        secrets: []
+        tools: []
+
+version: 0.1.0
+network:
+    egress:
+        - fqdn: api.anthropic.com
+          ports: [443]
+        # Hosted memory with the service-account token (card_agent/memory_atlas.py: HostedMemory).
+        - fqdn: agentengine.mongodb.com
+          ports: [443]

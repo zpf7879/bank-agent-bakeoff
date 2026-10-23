@@ -129,19 +129,24 @@ agentengine version
 ```bash
 agentengine auth login
 agentengine create          # LangGraph + Python, Hello World template, Anthropic, memory: yes
-cp side_b_atlas/project-config.yaml <project>/
-cp -R side_b_atlas/agents/card-agent/{agent.yaml,card_agent,bakeoff} <project>/agents/<agent>/
+A=<project>/agents/<agent>
+cp -R side_b_atlas/agents/card-agent/{card_agent,bakeoff} $A/src/
 ```
-**Watch:** merge our `pyproject.toml` dependencies into the scaffold's file, and keep its private package index entries. If the scaffold puts code under `src/`, move `card_agent/` and `bakeoff/` there and keep `entrypoint: card_agent.main:app` importable.
+Then merge three files by hand, because the scaffold's versions carry values you must keep:
+- **`$A/agent.yaml`:** take ours, but keep the scaffold's `name`. That's the slug the platform registered.
+- **`$A/pyproject.toml`:** add our extra dependencies (`langgraph`, `langchain-core`, `pymongo`). Set the wheel `packages` to `["src/card_agent", "src/bakeoff"]`, and point `[project.scripts]` at `card_agent.main:main`.
+- **`<project>/project-config.yaml`:** the scaffold's values already match ours: Voyage embeddings, Claude extraction through `LLM_API_KEY`, and procedural plus taxonomic extraction. Keep it, and check that it still matches.
+
+Check the result with `agentengine agent validate` from `$A`.
+**Watch:** with LangGraph + Python, the scaffold uses a `src/` layout. The `entrypoint` (`card_agent.main:app`) has no `src.` prefix. Keep the scaffold's own `src/agent_<name>/` package, because nothing imports it.
 
 **2.2 Link the cluster and set secrets.** From the agent directory:
 ```bash
 agentengine init
 agentengine atlas setup                       # pick or create the cluster; stores MONGODB_URI
-agentengine secret set ANTHROPIC_API_KEY
-agentengine secret set VOYAGE_API_KEY --project-scope
-agentengine secret set ANTHROPIC_API_KEY --project-scope   # for memory extraction
-agentengine memory configure
+agentengine secret set VOYAGE_API_KEY        # project-scoped by default
+agentengine secret set LLM_API_KEY --sync    # Anthropic key: the agent and memory extraction both read it
+agentengine memory configure && agentengine memory apply
 ```
 Use an M10 or larger cluster in AWS Singapore. Database auditing, which Scene 1 relies on, needs a dedicated tier.
 **Watch:** if the deployed agent can't reach the bank collections, run `agentengine atlas link` so the cluster is on the agent's egress policy.
@@ -151,7 +156,10 @@ Use an M10 or larger cluster in AWS Singapore. Database auditing, which Scene 1 
 python side_b_atlas/scripts/seed_atlas.py --reset
 agentengine deploy --auto                     # 10 to 20 minutes the first time
 agentengine service-account create bakeoff --role PROJECT_OWNER   # save client ID/secret in .env
-pip install agent-engine-sdk-memory --extra-index-url "https://ignore:$ACCESS_TOKEN@agentengine.mongodb.com/api/v1/packages/python/simple"
+agentengine secret set AE_CLIENT_ID --sync       # the agent reads per-customer memory as this service account
+agentengine secret set AE_CLIENT_SECRET --sync
+agentengine deploy                               # pick up the two new secrets
+pip install agent-engine-sdk-memory              # on PyPI
 python side_b_atlas/scripts/seed_memory.py    # run once (procedures are create-only)
 ```
 

@@ -67,21 +67,46 @@ class SideB:
         return self._token
 
     def ask(self, message: str, session_id: str, customer_id: str) -> Reply:
+        # invokeStream (SSE) stays open until the run ends; the synchronous /invoke
+        # endpoint is cut by the gateway with a 504 after about a minute.
         started = time.perf_counter()
+        parts: list[str] = []
+        final, tool_calls, memory = "", [], {}
+        execution_id, status, error = None, "running", None
         try:
-            resp = httpx.post(
-                f"{self.base}/api/v1/projects/{self.project}/workspaces/{self.workspace}/invoke",
+            with httpx.stream(
+                "POST",
+                f"{self.base}/api/v1/projects/{self.project}/workspaces/{self.workspace}/invokeStream",
                 headers={
                     "Authorization": f"Bearer {self._auth()}",
                     "X-Session-ID": session_id,
                     "X-Mdb-Agent-Engine-Custom-Customer-Id": customer_id,
+                    "Accept": "text/event-stream",
                 },
                 json={"message": message, "customer_id": customer_id},
-                timeout=180,
-            )
-            resp.raise_for_status()
-            body = resp.json()
+                timeout=httpx.Timeout(30, read=300),
+            ) as resp:
+                resp.raise_for_status()
+                for line in resp.iter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    chunk = json.loads(line[5:].strip() or "{}")
+                    execution_id = chunk.get("execution_id") or execution_id
+                    kind, meta = chunk.get("chunk_type"), chunk.get("metadata") or {}
+                    if kind == "text":
+                        parts.append(str(chunk.get("content") or ""))
+                    elif kind == "progress" and meta.get("phase") == "tool_start" and meta.get("tool_name") != "invoke_llm":
+                        tool_calls.append(meta.get("tool_name"))
+                    elif kind == "memory":  # emitted by card_agent/memory_atlas.py
+                        memory = json.loads(chunk.get("content") or "{}")
+                    elif kind == "error":
+                        status, error = "error", str(chunk.get("content") or chunk)
+                        break
+                    elif kind == "done":
+                        status, final = "completed", str(chunk.get("content") or "")
+                        break
         except Exception as exc:
-            return Reply(self.name, "", int((time.perf_counter() - started) * 1000), error=str(exc))
-        return Reply(self.name, str(body.get("response", "")), int((time.perf_counter() - started) * 1000),
-                     extra={"execution_id": body.get("execution_id"), "status": body.get("status")})
+            error = str(exc)
+        extra: dict[str, Any] = {"tool_calls": tool_calls, **memory, "execution_id": execution_id, "status": status}
+        return Reply(self.name, final or "".join(parts), int((time.perf_counter() - started) * 1000),
+                     error=error, extra=extra)

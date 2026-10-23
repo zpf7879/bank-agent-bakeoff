@@ -1,7 +1,8 @@
 # Side B project-level memory configuration (shared by all agents in the project).
-# Secrets are NOT set here. Upload them with:
-#   agentengine secret set VOYAGE_API_KEY --project-scope
-#   agentengine secret set ANTHROPIC_API_KEY --project-scope
+# Secrets are NOT set here. Upload them as project secrets:
+#   agentengine secret set VOYAGE_API_KEY
+#   agentengine secret set LLM_API_KEY --sync
+# After changing this file: agentengine memory configure && agentengine memory apply
 memory:
   log_level: info
 
@@ -15,18 +16,19 @@ memory:
   # Same provider as the agent: Claude through the Anthropic API.
   extraction_llm:
     provider: anthropic
-    model: null
-    api_key_secret: ANTHROPIC_API_KEY
+    model: claude-sonnet-5
+    api_key_secret: LLM_API_KEY
 
   background_extraction:
     snapshot:
       max_messages: 20
-      stale_minutes: 3
+      stale_minutes: 1
 
-  # All four built-in long-term types (the docs' list also includes entity and preferences).
+  # Valid types: semantic, episodic, taxonomic, preferences, procedural.
+  # find_procedure needs procedural; define_bank_term needs taxonomic.
   extraction:
     enabled:
       - semantic
       - episodic
-      - procedural
       - taxonomic
+      - procedural

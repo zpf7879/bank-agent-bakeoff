@@ -1,15 +1,19 @@
-# Merge these dependencies into the pyproject.toml that `agentengine create` generated.
-# Keep the scaffold's [[tool.uv.index]] entries: agent-engine-sdk-langgraph installs
-# from the Atlas Agent Engine private package registry.
+# Merge into the pyproject.toml that `agentengine create` generated: add the
+# dependencies below, and list card_agent and bakeoff in the wheel packages.
+# The agent-engine-* packages install from PyPI.
 [project]
 name = "card-agent-atlas"
 version = "0.1.0"
 description = "Bake-off Side B: LangGraph card agent on MongoDB Atlas Agent Engine"
 requires-python = ">=3.11"
 dependencies = [
-  "agent-engine-sdk-langgraph",
+  "agent-engine-runner-shared[mongodb]>=0.11.3,<1",
+  "agent-engine-sdk-langgraph>=0.11.3,<1",
   "langgraph>=0.6",
   "langchain-core>=0.3",
-  "langchain-anthropic>=0.3",
+  "langchain-anthropic>=1.4.0",
   "pymongo>=4.8",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/card_agent", "src/bakeoff"]

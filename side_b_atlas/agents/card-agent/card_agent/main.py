@@ -14,17 +14,23 @@ from agent_engine_sdk_langgraph import App
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage
 from langgraph.prebuilt import ToolNode
+from pydantic import SecretStr
 
 from bakeoff import DEFAULT_CUSTOMER_ID, DEFAULT_MODEL, build_graph, make_tool_functions
 from card_agent.bank_atlas import AtlasBank
-from card_agent.memory_atlas import AtlasMemory
+from card_agent.memory_atlas import AtlasMemory, HostedMemory
 
 log = logging.getLogger("card_agent")
 MODEL = os.getenv("ANTHROPIC_MODEL", DEFAULT_MODEL)
 
 app = App(app_name="card-agent")
 bank = AtlasBank()
-memory = AtlasMemory(lambda: app.memory)
+# Per-customer memory needs the service-account client (see HostedMemory); without
+# AE_CLIENT_ID/AE_CLIENT_SECRET secrets, fall back to app.memory (caller identity only).
+_hosted = HostedMemory.from_env()
+if _hosted is None:
+    log.warning("AE_CLIENT_ID/AE_CLIENT_SECRET not set: per-customer memory calls will get 403 via app.memory")
+memory = AtlasMemory(_hosted or (lambda: app.memory))
 
 # Register the shared tools through the platform wrapper, so every call is
 # audited and checked by the policy engine.
@@ -58,12 +64,26 @@ def prepare(agent_input: Any, ctx: Any) -> dict[str, Any]:
     }
 
 
+def _anthropic_key() -> SecretStr:
+    # Agent Engine scaffolds name the model secret LLM_API_KEY; ANTHROPIC_API_KEY works for local runs.
+    key = os.getenv("LLM_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+    if not key:
+        raise RuntimeError("No Anthropic key: agentengine secret set LLM_API_KEY")
+    return SecretStr(key)
+
+
 @app.entrypoint
 def build_agent():
     # No temperature: claude-sonnet-5-5 rejects non-default values. Keep this identical to Side A.
-    llm = app.llm(ChatAnthropic(model=MODEL, max_tokens=1024))
+    llm = app.llm(ChatAnthropic(model=MODEL, api_key=_anthropic_key(), max_tokens=1024))
     llm_with_tools = llm.bind_tools(app.get_tool_schemas())
     return build_graph(llm_with_tools, ToolNode(app.get_tools()), memory, app.checkpointer())
 
 
-app.run()
+def main() -> None:
+    # The platform imports `app` (agent.yaml entrypoint) and calls app.run() itself.
+    app.run()
+
+
+if __name__ == "__main__":
+    main()
