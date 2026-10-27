@@ -3,33 +3,21 @@ from __future__ import annotations
 
 import os
 from datetime import date
-from typing import Any, Callable
+from typing import Any
+
+from pymongo import MongoClient
 
 
 class AtlasBank:
-    def __init__(
-        self,
-        uri: str | None = None,
-        db_name: str | None = None,
-        database: Any = None,
-        today: Callable[[], date] | None = None,
-    ):
-        # `database` lets the local query monitor run these same calls with no cluster.
-        # Deployed, Agent Engine injects MONGODB_URI and `database` stays unset.
-        self._database = database
-        self._today = today or date.today
-        self._uri = uri
+    def __init__(self, uri: str | None = None, db_name: str | None = None):
+        self._uri = uri or os.environ["MONGODB_URI"]  # injected by Atlas Agent Engine
         self._db_name = db_name or os.getenv("BANK_DB", "harbourline")
-        self._client: Any = None
+        self._client: MongoClient | None = None
 
     @property
     def db(self):
-        if self._database is not None:
-            return self._database
         if self._client is None:
-            from pymongo import MongoClient
-
-            self._client = MongoClient(self._uri or os.environ["MONGODB_URI"], appname="harbourline-card-agent")
+            self._client = MongoClient(self._uri, appname="harbourline-card-agent")
         return self._client[self._db_name]
 
     def get_account(self, customer_id: str) -> dict[str, Any] | None:
@@ -46,7 +34,7 @@ class AtlasBank:
             "customer_id": customer_id,
             "amount_sgd": amount_sgd,
             "reason_code": reason_code,
-            "waived_on": self._today().isoformat(),
+            "waived_on": date.today().isoformat(),
         }
         self.db.fee_waivers.insert_one(dict(doc))
         self.db.accounts.update_one({"customer_id": customer_id}, {"$set": {"late_fee_sgd": 0}})
