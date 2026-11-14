@@ -23,8 +23,6 @@ scripts/sync_shared.sh   copies shared/bakeoff into both agents and diffs them
 tests/                   offline tests (no cloud needed)
 ```
 
-> **Status.** Tested offline only: the shared graph end to end with a scripted model, and both memory adapters against fake clients. Side A API shapes were checked against boto3 1.43. Side B is written against the Atlas Agent Engine docs (public preview) and has not run against the live service. Expect small fixes on first deploy. See [Verify before a customer sees it](#verify-before-a-customer-sees-it).
-
 ---
 
 ## 0. Prerequisites
@@ -49,16 +47,14 @@ pip install -r demo/requirements.txt
 
 ## 1. Deploy Side A (AgentCore)
 
-**1.1 Check the region.** Confirm AgentCore Runtime and Memory are offered in `ap-southeast-1` (AgentCore console). If not, use the nearest supported region for Side A and say so in the demo.
+**1.1 Check the region.** Confirm AgentCore Runtime and Memory are offered in the region, e.g. `ap-southeast-1` (AgentCore console). If not, use the nearest supported region for Side A.
 
 **1.2 Create the bank database.** Create an Aurora PostgreSQL cluster (database `harbourline`), put its connection settings in `.env`, then:
 ```bash
 python side_a_agentcore/scripts/seed_aurora.py --reset
 ```
-Connection settings, checked in this order:
-- `BANK_PG_IAM_AUTH=true` with `BANK_PG_HOST` (plus optional `BANK_PG_PORT`, `BANK_PG_DBNAME`, `BANK_PG_USER`): IAM database auth. A fresh token is generated for every connection, so nothing expires mid-demo. Whoever connects needs `rds-db:connect` on `arn:aws:rds-db:<region>:<account>:dbuser:<cluster-resource-id>/<user>`, and the user needs `GRANT rds_iam TO <user>;`.
-- `BANK_PG_DSN`: a full connection string with a password. Quote it in `.env`.
-- `BANK_PG_SECRET_ARN`: a Secrets Manager secret with `host`, `username`, `password`.
+Connection settings:
+- `BANK_PG_IAM_AUTH=true` with `BANK_PG_HOST` (plus optional `BANK_PG_PORT`, `BANK_PG_DBNAME`, `BANK_PG_USER`): IAM database auth. A fresh token is generated for every connection, so nothing expires mid-demo.
 
 **1.3 Scaffold and drop in the agent.**
 ```bash
@@ -73,21 +69,11 @@ Run this in a WSL/Linux home directory if you can: `uv` installs are very slow o
 **Watch:** the `cp` replaces the scaffold's `pyproject.toml`. Ours keeps the two OpenTelemetry packages (`aws-opentelemetry-distro`, `opentelemetry-instrumentation-langchain`); without them the runtime fails with "OpenTelemetry instrumentation executable not found". If you edit `pyproject.toml`, keep them.
 **Watch:** the Anthropic key. `main.py` reads `ANTHROPIC_API_KEY`, then `ANTHROPIC_CREDENTIAL_PROVIDER`, then the credential provider `agentcore create --api-key` declared (the CLI passes its name as `CREDENTIAL_<NAME>_NAME`), so the scaffold's key works with no extra setting.
 
-**1.3b Give the runtime its settings and permissions.** In `CardAgentA/agentcore/agentcore.json`, add to the runtime entry:
-```json
-"envVars": [
-  { "name": "ANTHROPIC_MODEL", "value": "claude-sonnet-5-5" },
-  { "name": "MAX_CONTEXT_TOKENS", "value": "1500" },
-  { "name": "VERIFY_BEFORE_OFFER", "value": "false" },
-  { "name": "BANK_PG_IAM_AUTH", "value": "true" },
-  { "name": "BANK_PG_HOST", "value": "<aurora endpoint>" },
-  { "name": "BANK_PG_PORT", "value": "5432" },
-  { "name": "BANK_PG_DBNAME", "value": "harbourline" },
-  { "name": "BANK_PG_USER", "value": "postgres" }
-],
-"additionalPolicies": ["runtime-policy.json"]
+**1.3b Give the runtime its settings and permissions.**
+```bash
+python side_a_agentcore/scripts/configure_runtime.py && (cd CardAgentA && agentcore validate)
 ```
-Use the same values as your `.env`. Then copy `side_a_agentcore/runtime-policy.example.json` to `CardAgentA/app/CardAgent/runtime-policy.json` and fill in the placeholders (`<cluster-resource-id>` comes from `aws rds describe-db-clusters --query 'DBClusters[0].DbClusterResourceId'`). It grants `rds-db:connect` for IAM database auth, and `BatchCreateMemoryRecords` / `BatchDeleteMemoryRecords`, which the scaffold's role lacks. It also lets the agent read the `/bakeoff/*` namespaces (facts it writes, procedures, glossary) and `/episodes/<customer>`: the scaffold only allows reads from its own strategy namespaces, so without this every turn fails with AccessDenied on `RetrieveMemoryRecords`. Check with `agentcore validate`.
+This copies the settings from `.env` into `CardAgentA/agentcore/agentcore.json` and writes `CardAgentA/app/CardAgent/runtime-policy.json` (IAM database auth plus the memory permissions the scaffold's role lacks). Run it again whenever you change `.env`.
 
 **1.4 Deploy, then wire memory.**
 ```bash
