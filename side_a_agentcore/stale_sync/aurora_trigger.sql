@@ -7,7 +7,8 @@
 --   4. The Lambda function in handler.py, with its own IAM role for AgentCore Memory
 --   5. Retries, dead-letter queue and monitoring for 1-4 (not shown)
 --
--- Replace the ARN and region below before running.
+-- Install with side_a_agentcore/scripts/stale_sync_trigger.py install, which fills in
+-- <region> and <account-id>. To run it by hand, replace them first.
 
 CREATE EXTENSION IF NOT EXISTS aws_lambda CASCADE;
 
@@ -16,8 +17,8 @@ BEGIN
   IF NEW.status IS DISTINCT FROM OLD.status THEN
     PERFORM aws_lambda.invoke(
       aws_commons.create_lambda_function_arn(
-        'arn:aws:lambda:ap-southeast-1:123456789012:function:card-agent-stale-sync',
-        'ap-southeast-1'),
+        'arn:aws:lambda:<region>:<account-id>:function:card-agent-stale-sync',
+        '<region>'),
       json_build_object('customer_id', NEW.customer_id, 'status', NEW.status)::json,
       'Event'   -- async; failures do not block the account update
     );

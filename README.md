@@ -91,7 +91,7 @@ cd CardAgentA
 agentcore deploy
 cd ..
 ```
-Why: `describe_memory.py` records which namespace each built-in strategy writes to, and prints the Scene 1 security facts (key type, event expiry).
+Why: `describe_memory.py` records which memory namespace each built-in strategy writes to, and prints the Scene 1 security facts.
 
 **1.5 Seed memory and smoke-test.**
 ```bash
@@ -100,7 +100,16 @@ export SIDE_A_RUNTIME_ARN=<from agentcore status>
 python demo/run_scene.py --side a --message "Hi, what card do I have?"
 ```
 
-**1.6 (Scene 2 only) Stale-memory pipeline.** Deploy `stale_sync/handler.py` as Lambda `card-agent-stale-sync`, attach an IAM role to the Aurora cluster that allows `lambda:InvokeFunction`, then run `stale_sync/aurora_trigger.sql`. Keep it switched off for the first half of Scene 2.
+**1.6 (Scene 2 only) Stale-memory pipeline.** Deploy `stale_sync/handler.py` as Lambda `card-agent-stale-sync`, and attach an IAM role to the Aurora cluster that allows `lambda:InvokeFunction`. Then install the Aurora trigger that calls the Lambda:
+```bash
+python side_a_agentcore/scripts/stale_sync_trigger.py install
+```
+This fills your region and account into `stale_sync/aurora_trigger.sql` and runs it with the `.env` connection settings. Connect as the cluster's master user. The trigger is installed switched off, ready for the first half of Scene 2. To switch it on or off, or check it:
+```bash
+python side_a_agentcore/scripts/stale_sync_trigger.py on
+python side_a_agentcore/scripts/stale_sync_trigger.py off
+python side_a_agentcore/scripts/stale_sync_trigger.py status
+```
 
 ---
 
@@ -188,9 +197,9 @@ python demo/freeze_card.py --status frozen
 python demo/run_scene.py 2                         # Side A repeats the stale offer
 python side_b_atlas/scripts/audit_join.py          # one query: held customers whose memory still has an offer
 ```
-Then enable the Side A trigger and Lambda (step 1.6), reset with `--status active`, re-seed the offer, and freeze again to show Side A also fixed, at the cost of five extra moving parts.
+Then switch on the Side A trigger (`python side_a_agentcore/scripts/stale_sync_trigger.py on`, see step 1.6), reset with `--status active`, re-seed the offer, and freeze again to show Side A also fixed, at the cost of five extra moving parts.
 For the "obvious challenge", redeploy both sides with `VERIFY_BEFORE_OFFER=true` and compare tool calls and latency.
-Reset afterwards: `python demo/freeze_card.py --status active`, then restore the offer with `seed_memory.py --offer-only` on each side.
+Reset afterwards: `python demo/freeze_card.py --status active`, switch the trigger off with `stale_sync_trigger.py off`, then restore the offer with `seed_memory.py --offer-only` on each side.
 
 **Scene 3 · Fee-waiver procedure**
 ```bash
