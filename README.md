@@ -92,8 +92,6 @@ agentcore deploy
 cd ..
 ```
 Why: `describe_memory.py` records which namespace each built-in strategy writes to, and prints the Scene 1 security facts (key type, event expiry).
-**Watch:** if a deploy step fails with "security token included in the request is expired", run `aws login` (or `aws sso login`) and deploy again. If scripts fail with "You must specify a region" even though `AWS_REGION` is set, run `aws configure set region ap-southeast-1` (or set `AWS_DEFAULT_REGION`): boto3 refreshes `aws login` credentials with the default region, not `AWS_REGION`. If boto3 asks for `botocore[crt]`, run `pip install -r demo/requirements.txt` again.
-**Watch:** the runtime role needs `bedrock-agentcore:RetrieveMemoryRecords`, `ListMemoryRecords`, `BatchCreateMemoryRecords`, `BatchDeleteMemoryRecords` and `CreateEvent` on the memory ARN. Step 1.3b covers the two the scaffold lacks. Add any others if the first scene returns AccessDenied.
 
 **1.5 Seed memory and smoke-test.**
 ```bash
