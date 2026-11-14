@@ -72,11 +72,24 @@ python side_a_agentcore/scripts/configure_runtime.py && (cd CardAgentA && agentc
 This copies the settings from `.env` into `CardAgentA/agentcore/agentcore.json` and writes `CardAgentA/app/CardAgent/runtime-policy.json`, which gives the runtime's IAM role what `agentcore deploy` leaves out: `rds-db:connect` for Aurora, `BatchCreate`/`BatchDeleteMemoryRecords`, and searching the `/bakeoff/*` and `/episodes/<customer>` memory namespaces. Run it again whenever you change `.env`.
 
 **1.4 Deploy, then wire memory.**
+
+Deploy, and note the memory ID or ARN that `status` prints:
 ```bash
-cd CardAgentA && agentcore deploy && agentcore status --type memory   # note the memory ID or ARN
-cd .. && python side_a_agentcore/scripts/describe_memory.py --memory-id <id or ARN>
+cd CardAgentA
+agentcore deploy
+agentcore status --type memory
+cd ..
+```
+Record the memory's namespaces and copy them into the agent:
+```bash
+python side_a_agentcore/scripts/describe_memory.py --memory-id <id or ARN>
 cp side_a_agentcore/app/card_agent/memory_config.json CardAgentA/app/CardAgent/
-cd CardAgentA && agentcore deploy
+```
+Deploy again so the agent ships with `memory_config.json`:
+```bash
+cd CardAgentA
+agentcore deploy
+cd ..
 ```
 Why: `describe_memory.py` records which namespace each built-in strategy writes to, and prints the Scene 1 security facts (key type, event expiry).
 **Watch:** if a deploy step fails with "security token included in the request is expired", run `aws login` (or `aws sso login`) and deploy again. If scripts fail with "You must specify a region" even though `AWS_REGION` is set, run `aws configure set region ap-southeast-1` (or set `AWS_DEFAULT_REGION`): boto3 refreshes `aws login` credentials with the default region, not `AWS_REGION`. If boto3 asks for `botocore[crt]`, run `pip install -r demo/requirements.txt` again.
