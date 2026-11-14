@@ -54,7 +54,7 @@ pip install -r demo/requirements.txt
 python side_a_agentcore/scripts/seed_aurora.py --reset
 ```
 Connection settings:
-- `BANK_PG_IAM_AUTH=true` with `BANK_PG_HOST` (plus optional `BANK_PG_PORT`, `BANK_PG_DBNAME`, `BANK_PG_USER`): IAM database auth. A fresh token is generated for every connection, so nothing expires mid-demo.
+`BANK_PG_IAM_AUTH=true` with `BANK_PG_HOST` (plus optional `BANK_PG_PORT`, `BANK_PG_DBNAME`, `BANK_PG_USER`): IAM database auth. A fresh token is generated for every connection, so nothing expires mid-demo.
 
 **1.3 Scaffold and drop in the agent.**
 ```bash
@@ -64,10 +64,6 @@ agentcore create --project-name CardAgentA --name CardAgent --framework LangChai
 cp -R side_a_agentcore/app/card_agent/* CardAgentA/app/CardAgent/
 ```
 Why PUBLIC mode: this setup uses Aurora express configuration, which has no VPC. The runtime reaches Aurora over the internet, and IAM database auth (`BANK_PG_IAM_AUTH=true`) is the access control. PUBLIC mode also reaches the Anthropic API and AgentCore Memory with no NAT gateway.
-**If your Aurora cluster is in a VPC** (`aws rds describe-db-clusters` shows a `DBSubnetGroup`), use `--network-mode VPC --subnets <private subnet ids> --security-groups <agent sg>` instead. Allow TCP 5432 from the agent security group in Aurora's security group, and give the subnets a NAT gateway so the runtime can still call the Anthropic API.
-Run this in a WSL/Linux home directory if you can: `uv` installs are very slow on `/mnt/c`.
-**Watch:** the `cp` replaces the scaffold's `pyproject.toml`. Ours keeps the two OpenTelemetry packages (`aws-opentelemetry-distro`, `opentelemetry-instrumentation-langchain`); without them the runtime fails with "OpenTelemetry instrumentation executable not found". If you edit `pyproject.toml`, keep them.
-**Watch:** the Anthropic key. `main.py` reads `ANTHROPIC_API_KEY`, then `ANTHROPIC_CREDENTIAL_PROVIDER`, then the credential provider `agentcore create --api-key` declared (the CLI passes its name as `CREDENTIAL_<NAME>_NAME`), so the scaffold's key works with no extra setting.
 
 **1.3b Give the runtime its settings and permissions.**
 ```bash
