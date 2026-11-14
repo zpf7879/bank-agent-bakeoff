@@ -63,13 +63,13 @@ agentcore create --project-name CardAgentA --name CardAgent --framework LangChai
   --network-mode PUBLIC
 cp -R side_a_agentcore/app/card_agent/* CardAgentA/app/CardAgent/
 ```
-Why PUBLIC mode: this setup uses Aurora express configuration, which has no VPC. The runtime reaches Aurora over the internet, and IAM database auth (`BANK_PG_IAM_AUTH=true`) is the access control. PUBLIC mode also reaches the Anthropic API and AgentCore Memory with no NAT gateway.
+Why PUBLIC mode: this setup uses Aurora express configuration, which has no VPC. The runtime reaches Aurora over the internet, and IAM database auth (`BANK_PG_IAM_AUTH=true`) is the access control. 
 
 **1.3b Give the runtime its settings and permissions.**
 ```bash
 python side_a_agentcore/scripts/configure_runtime.py && (cd CardAgentA && agentcore validate)
 ```
-This copies the settings from `.env` into `CardAgentA/agentcore/agentcore.json` and writes `CardAgentA/app/CardAgent/runtime-policy.json` (IAM database auth plus the memory permissions the scaffold's role lacks). Run it again whenever you change `.env`.
+This copies the settings from `.env` into `CardAgentA/agentcore/agentcore.json` and writes `CardAgentA/app/CardAgent/runtime-policy.json`, which gives the runtime's IAM role what `agentcore deploy` leaves out: `rds-db:connect` for Aurora, `BatchCreate`/`BatchDeleteMemoryRecords`, and searching the `/bakeoff/*` and `/episodes/<customer>` memory namespaces. Run it again whenever you change `.env`.
 
 **1.4 Deploy, then wire memory.**
 ```bash
